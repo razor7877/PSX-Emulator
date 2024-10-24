@@ -2,16 +2,16 @@
 
 #define WORD_SIZE 4
 #define KIB_SIZE 1024
+#define KIB_TO_WORD_SIZE (KIB_SIZE / WORD_SIZE)
 
-/// <summary>
-/// 512 KiB - Doesn't correspond to actual BIOS ROM size
-/// </summary>
-uint32_t bios_rom[2048 * KIB_SIZE / WORD_SIZE];
-
-/// <summary>
-/// 0.5 KiB
-/// </summary>
-uint32_t cpu_cache_control[512 / WORD_SIZE];
+#define RAM_SIZE (2048 * KIB_SIZE)
+#define EXPANSION_1_SIZE (8192 * KIB_SIZE)
+#define SCRATCHPAD_SIZE (1 * KIB_SIZE)
+#define IO_PORTS_SIZE (4 * KIB_SIZE)
+#define EXPANSION_2_SIZE (8 * KIB_SIZE)
+#define EXPANSION_3_SIZE (2048 * KIB_SIZE)
+#define BIOS_ROM_SIZE (512 * KIB_SIZE)
+#define CONTROL_REGISTERS_SIZE 512
 
 /// <summary>
 /// Reads a word at the address
