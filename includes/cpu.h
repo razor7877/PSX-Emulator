@@ -17,6 +17,8 @@ typedef struct
 extern uint32_t _registers[32];
 extern uint32_t current_opcode;
 
+void test_instructions();
+
 void undefined();
 
 // Standard opcodes

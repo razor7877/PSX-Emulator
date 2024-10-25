@@ -205,6 +205,90 @@ const instruction secondary_opcodes[0x40] = {
     { "N/A", undefined }          // 3Fh
 };
 
+void reset_cpu_state()
+{
+    for (int i = 0; i < 32; i++)
+        _registers[i] = 0;
+
+    pc = 0xBFC00000;
+    hi = 0;
+    lo = 0;
+    current_opcode = 0;
+    jmp_next_instr = false;
+    jmp_address = 0;
+}
+
+void test_beq()
+{
+    _registers[0] = 0;
+    _registers[1] = 0;
+
+    current_opcode = 0b00010100000000010000000001000000;
+
+    uint32_t last_pc = pc;
+    beq();
+
+    if (pc != (last_pc + 0x100))
+        log_error("Incorrect BEQ behavior, did not trigger jump on equal registers\n");
+
+    reset_cpu_state();
+
+    _registers[0] = 0;
+    _registers[1] = 1;
+
+    // +0x100 offset
+    current_opcode = 0b00010100000000010000000001000000;
+
+    last_pc = pc;
+    beq();
+
+    if (pc == (last_pc + 0x100))
+        log_error("Incorrect BEQ behavior, triggered jump on different registers\n");
+
+    reset_cpu_state();
+
+    log_info("Finished testing BEQ\n");
+}
+
+void test_bne()
+{
+    _registers[0] = 0;
+    _registers[1] = 0;
+
+    current_opcode = 0b00010100000000010000000001000000;
+
+    uint32_t last_pc = pc;
+    bne();
+
+    if (pc == (last_pc + 0x100))
+        log_error("Incorrect BNE behavior, triggered jump on equal registers\n");
+
+    reset_cpu_state();
+
+    _registers[0] = 0;
+    _registers[1] = 1;
+
+    // +0x100 offset
+    current_opcode = 0b00010100000000010000000001000000;
+
+    last_pc = pc;
+    bne();
+
+    if (pc != (last_pc + 0x100))
+        log_error("Incorrect BNE behavior, did not trigger jump on different registers\n");
+
+    reset_cpu_state();
+
+    log_info("Finished testing BNE\n");
+}
+
+void test_instructions()
+{
+    log_info("Starting CPU instructions unit tests...\n");
+    test_beq();
+    test_bne();
+}
+
 void undefined()
 {
     log_error("Attempted to execute undefined opcode!\n");
@@ -312,9 +396,10 @@ void addi()
 void addiu()
 {
     uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
 
-    uint64_t sum = (uint64_t)(rs_val + rt_val);
+    int16_t signed_add = (int16_t)(current_opcode & 0xFFFF);
+
+    uint64_t sum = (uint64_t)(rs_val + signed_add);
     R(rd(current_opcode)) = sum;
 }
 
@@ -381,7 +466,7 @@ void lb()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint32_t word = (uint32_t)read_word(address / 4);
+    uint32_t word = (uint32_t)read_word(address);
     uint8_t byte_index = address % 4;
 
     // First byte in first 8 bits, second in the next 8 and so on
@@ -404,7 +489,7 @@ void lh()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint32_t word = (uint32_t)read_word(address / 4);
+    uint32_t word = (uint32_t)read_word(address);
     uint16_t byte_index = address % 2;
 
     // First byte in first 8 bits, second in the next 8 and so on
@@ -429,10 +514,10 @@ void lw()
     // Get signed offset from 16 lower bits
     int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
 
-    int address = base_addr + offset;
+    uint32_t address = base_addr + offset;
 
     // Get the word
-    uint32_t word = (uint32_t)read_word(address / 4);
+    uint32_t word = (uint32_t)read_word(address);
 
     R(rt(current_opcode)) = word;
 }
@@ -448,7 +533,7 @@ void lbu()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint32_t word = (uint32_t)read_word(address / 4);
+    uint32_t word = (uint32_t)read_word(address);
     uint8_t byte_index = address % 4;
 
     // First byte in first 8 bits, second in the next 8 and so on
@@ -470,7 +555,7 @@ void lhu()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint32_t word = (uint32_t)read_word(address / 4);
+    uint32_t word = (uint32_t)read_word(address);
     uint16_t byte_index = address % 2;
 
     // First byte in first 8 bits, second in the next 8 and so on
@@ -807,10 +892,23 @@ void handle_instruction()
     // Get secondary opcode from 6 lowest bits
     uint8_t secondary_opcode = current_opcode & 0x3F;
 
+    /*if (primary_opcode != 0x00)
+        log_info("Executing opcode %s\n\tAddress %x\n", primary_opcodes[primary_opcode].disassembly, pc);
+    else
+        log_info("Executing opcode %s\n\tAddress %x\n", secondary_opcodes[secondary_opcode].disassembly, pc);*/
+
     if (primary_opcode == 0x00)
         ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
     else
         ((void (*)(void))primary_opcodes[primary_opcode].function)();
+
+    if (pc == 0x80030000)
+    {
+        log_info("Reached pc 0x80030000\n");
+    }
+
+    //char line[256];
+    //fgets(line, sizeof(line), stdin);
 
     // Jump if we have a jump in delay slot, otherwise increment pc normally
     if (jmp_next_instr)

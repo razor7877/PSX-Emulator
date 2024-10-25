@@ -35,10 +35,12 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	for (;;)
+	test_instructions();
+
+	/*for (;;)
 	{
 		handle_instruction();
-	}
+	}*/
 
 	return 0;
 }
