@@ -11,7 +11,6 @@ typedef struct
 void undefined();
 
 // Standard opcodes
-void special();
 void b_cond_z();
 void j();
 void jal();
@@ -76,8 +75,8 @@ void addu();
 void sub();
 void subu();
 void and();
-void or();
-void xor();
+void op_or();
+void op_xor();
 void nor();
 void slt();
 void sltu();

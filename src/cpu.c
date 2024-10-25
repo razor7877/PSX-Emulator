@@ -42,6 +42,7 @@
 #define rs(value) ((value & 0x03E00000) >> 21)
 #define rt(value) ((value & 0x001F0000) >> 16)
 #define rd(value) ((value & 0x0000F800) >> 11)
+#define imm5(value) ((value & 0x000007C0) >> 6)
 
 // Initialize registers
 uint32_t _registers[32] = { 0 };
@@ -181,7 +182,6 @@ const instruction secondary_opcodes[0x40] = {
     { "N/A", undefined }          // 3Fh
 };
 
-
 /// <summary>
 /// Program counter
 /// </summary>
@@ -217,14 +217,19 @@ void undefined()
     log_error("Attempted to execute undefined opcode!\n");
 }
 
-void special()
-{
-
-}
-
 void b_cond_z()
 {
+    int32_t rs_val = (int32_t)R(rs(current_opcode));
 
+    R31 = pc + 0x8;
+
+    if (rs_val > 0)
+    {
+        uint16_t offset_16 = current_opcode & 0xFFFF;
+        int32_t offset_18 = (int32_t)(offset_16 << 2);
+
+        pc = pc + offset_18;
+    }
 }
 
 void j()
@@ -322,12 +327,19 @@ void addiu()
 
 void slti()
 {
+    int32_t rs_val = (int32_t)R(rs(current_opcode));
+    int16_t immediate = (int16_t)(current_opcode & 0xFFFF);
 
+    R(rt(current_opcode)) = rs_val < immediate;
 }
 
 void sltiu()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    // Sign extend the immediate but use it as an unsigned value
+    uint32_t immediate = (int32_t)(current_opcode & 0xFFFF);
 
+    R(rt(current_opcode)) = rs_val < immediate;
 }
 
 void andi()
@@ -341,17 +353,28 @@ void andi()
 
 void ori()
 {
+    uint16_t immediate = current_opcode & 0xFFFF;
+    uint32_t rs_val = R(rs(current_opcode));
 
+    uint32_t result = rs_val | immediate;
+    R(rt(current_opcode)) = result;
 }
 
 void xori()
 {
+    uint16_t immediate = current_opcode & 0xFFFF;
+    uint32_t rs_val = R(rs(current_opcode));
 
+    uint32_t result = rs_val ^ immediate;
+    R(rt(current_opcode)) = result;
 }
 
 void lui()
 {
+    uint16_t immediate = current_opcode & 0xFFFF;
+    uint32_t upper_value = immediate << 16;
 
+    R(rt(current_opcode)) = upper_value;
 }
 
 void cop0()
@@ -422,7 +445,7 @@ void lh()
 
 void lwl()
 {
-
+    log_warning("Unhandled instruction lwl\n");
 }
 
 void lw()
@@ -487,152 +510,187 @@ void lhu()
 
 void lwr()
 {
-
+    log_warning("Unhandled instruction lwr\n");
 }
 
 void sb()
 {
-
+    log_warning("Unhandled instruction sb\n");
 }
 
 void sh()
 {
-
+    log_warning("Unhandled instruction sh\n");
 }
 
 void swl()
 {
-
+    log_warning("Unhandled instruction swl\n");
 }
 
 void sw()
 {
-
+    log_warning("Unhandled instruction sw\n");
 }
 
 void swr()
 {
-
+    log_warning("Unhandled instruction swr\n");
 }
 
 void lwc0()
 {
-
+    log_warning("Unhandled instruction LWC0\n");
 }
 
 void lwc1()
 {
-
+    log_warning("Unhandled instruction LWC1\n");
 }
 
 void lwc2()
 {
-
+    log_warning("Unhandled instruction LWC2\n");
 }
 
 void lwc3()
 {
-
+    log_warning("Unhandled instruction LWC3\n");
 }
 
 void swc0()
 {
-
+    log_warning("Unhandled instruction SWC0\n");
 }
 
 void swc1()
 {
-
+    log_warning("Unhandled instruction SWC1\n");
 }
 
 void swc2()
 {
-
+    log_warning("Unhandled instruction SWC2\n");
 }
 
 void swc3()
 {
-
+    log_warning("Unhandled instruction SWC3\n");
 }
 
 void sll()
 {
+    uint8_t immediate = imm5(current_opcode);
+    uint32_t rt_val = R(rt(current_opcode));
 
+    R(rd(current_opcode)) = rt_val << immediate;
 }
 
 void srl()
 {
+    uint8_t immediate = imm5(current_opcode);
+    uint32_t rt_val = R(rt(current_opcode));
 
+    R(rd(current_opcode)) = rt_val >> immediate;
 }
 
 void sra()
 {
+    uint8_t immediate = imm5(current_opcode);
+    int32_t rt_val = (int32_t)R(rt(current_opcode));
 
+    // TODO : Make sure this does an arithmetic shift
+    R(rd(current_opcode)) = rt_val >> immediate;
 }
 
 void sllv()
 {
+    uint8_t rs_val_5 = R(rs(current_opcode)) & 0b11111;
+    uint32_t rt_val = R(rt(current_opcode));
 
+    R(rd(current_opcode)) = rt_val << rs_val_5;
 }
 
 void srlv()
 {
+    uint8_t rs_val_5 = R(rs(current_opcode)) & 0b11111;
+    uint32_t rt_val = R(rt(current_opcode));
 
+    R(rd(current_opcode)) = rt_val >> rs_val_5;
 }
 
 void srav()
 {
+    uint8_t rs_val_5 = R(rs(current_opcode)) & 0b11111;
+    int32_t rt_val = (int32_t)R(rt(current_opcode));
 
+    // TODO : Make sure this does an arithmetic shift
+    R(rd(current_opcode)) = rt_val >> rs_val_5;
 }
 
 void jr()
 {
-
+    jmp_address = R(rs(current_opcode));
+    jmp_next_instr = true;
 }
 
 void jalr()
 {
+    // Save return address in R31
+    R(rd(current_opcode)) = pc + 0x8;
 
+    jmp_address = R(rs(current_opcode));
+    jmp_next_instr = true;
 }
 
 void syscall()
 {
-
+    log_warning("Unhandled syscall instruction!\n");
 }
 
 void op_break()
 {
-
+    log_warning("Unhandled break instruction!\n");
 }
 
 void mfhi()
 {
-
+    R(rd(current_opcode)) = hi;
 }
 
 void mthi()
 {
-
+    hi = R(rs(current_opcode));
 }
 
 void mflo()
 {
-
+    R(rd(current_opcode)) = lo;
 }
 
 void mtlo()
 {
-
+    lo = R(rs(current_opcode));
 }
 
 void mult()
 {
+    int32_t rs_val = (int32_t)R(rs(current_opcode));
+    int32_t rt_val = (int32_t)R(rt(current_opcode));
 
+    int64_t mult_result = rs_val * rt_val;
+    hi = (mult_result & 0xFFFFFFFF00000000) >> 32;
+    lo = mult_result & 0xFFFFFFFF;
 }
 
 void multu()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
 
+    uint64_t mult_result = rs_val * rt_val;
+    hi = (mult_result & 0xFFFFFFFF00000000) >> 32;
+    lo = mult_result & 0xFFFFFFFF;
 }
 
 void div()
@@ -687,12 +745,24 @@ void addu()
 
 void sub()
 {
+    int32_t rs_val = (int32_t)R(rs(current_opcode));
+    int32_t rt_val = (int32_t)R(rt(current_opcode));
 
+    int64_t sub_result = rs_val - rt_val;
+
+    if (sub_result > 0xFFFFFFFF)
+        log_error("SUB instruction caused overflow!\n");
+    else
+        R(rd(current_opcode)) = sub_result & 0xFFFFFFFF;
 }
 
 void subu()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
 
+    uint64_t sub_result = rs_val - rt_val;
+    R(rd(current_opcode)) = sub_result & 0xFFFFFFFF;
 }
 
 void and()
@@ -703,29 +773,47 @@ void and()
     R(rd(current_opcode)) = rs_val & rt_val;
 }
 
-void or()
+void op_or()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
 
+    uint32_t result = rs_val | rt_val;
+    R(rt(current_opcode)) = result;
 }
 
-void xor()
+void op_xor()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
 
+    uint32_t result = rs_val ^ rt_val;
+    R(rt(current_opcode)) = result;
 }
 
 void nor()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
 
+    uint32_t nor_result = ~(rs_val | rt_val);
+    R(rd(current_opcode)) = nor_result;
 }
 
 void slt()
 {
+    int32_t rs_val = (int32_t)R(rs(current_opcode));
+    int32_t rt_val = (int32_t)R(rt(current_opcode));
 
+    R(rt(current_opcode)) = rs_val < rt_val;
 }
 
 void sltu()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rs(current_opcode));
 
+    R(rd(current_opcode)) = rs_val < rt_val;
 }
 
 void handle_instruction()
@@ -737,7 +825,7 @@ void handle_instruction()
     // Get secondary opcode from 6 lowest bits
     uint8_t secondary_opcode = current_opcode & 0x3F;
 
-    if (primary_opcode = 0x00)
+    if (primary_opcode == 0x00)
         ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
     else
         ((void (*)(void))primary_opcodes[primary_opcode].function)();
