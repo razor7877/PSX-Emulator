@@ -2,11 +2,20 @@
 
 #include <stdint.h>
 
+#define R(reg) _registers[reg]
+#define rs(value) ((value & 0x03E00000) >> 21)
+#define rt(value) ((value & 0x001F0000) >> 16)
+#define rd(value) ((value & 0x0000F800) >> 11)
+#define imm5(value) ((value & 0x000007C0) >> 6)
+
 typedef struct
 {
 	const char* disassembly;
 	void* function;
 } instruction;
+
+extern uint32_t _registers[32];
+extern uint32_t current_opcode;
 
 void undefined();
 
@@ -26,10 +35,6 @@ void andi();
 void ori();
 void xori();
 void lui();
-void cop0();
-void cop1();
-void cop2();
-void cop3();
 void lb();
 void lh();
 void lwl();

@@ -3,6 +3,7 @@
 #include "cpu.h"
 #include "memory.h"
 #include "logging.h"
+#include "coprocessor.h"
 
 #define R0 _registers[0]
 #define R1 _registers[1]
@@ -37,18 +38,41 @@
 #define R30 _registers[30]
 #define R31 _registers[31]
 
-#define R(reg) _registers[reg]
-
-#define rs(value) ((value & 0x03E00000) >> 21)
-#define rt(value) ((value & 0x001F0000) >> 16)
-#define rd(value) ((value & 0x0000F800) >> 11)
-#define imm5(value) ((value & 0x000007C0) >> 6)
-
 // Initialize registers
 uint32_t _registers[32] = { 0 };
 
+/// <summary>
+/// Program counter
+/// </summary>
+uint32_t pc = 0xBFC00000;
+
+/// <summary>
+/// Multiply/divide high result
+/// </summary>
+uint32_t hi = 0;
+
+/// <summary>
+/// Multiply/divde low result
+/// </summary>
+uint32_t lo = 0;
+
+/// <summary>
+/// The 32 bit value of the currently executed opcode
+/// </summary>
+uint32_t current_opcode = 0;
+
+/// <summary>
+/// Whether a jump should be executed on the next instruction
+/// </summary>
+bool jmp_next_instr = false;
+
+/// <summary>
+/// The address to jump to
+/// </summary>
+uint32_t jmp_address = 0x00;
+
 const instruction primary_opcodes[0x40] = {
-    { "SPECIAL", special },       // 00h
+    { "SPECIAL", NULL },       // 00h
     { "BCONDZ", b_cond_z },       // 01h
     { "J", j },                   // 02h
     { "JAL", jal },               // 03h
@@ -64,10 +88,10 @@ const instruction primary_opcodes[0x40] = {
     { "ORI", ori },               // 0Dh
     { "XORI", xori },             // 0Eh
     { "LUI", lui },               // 0Fh
-    { "COP0", cop0 },             // 10h
-    { "COP1", cop1 },             // 11h
-    { "COP2", cop2 },             // 12h
-    { "COP3", cop3 },             // 13h
+    { "COP0", handle_cop0_instruction },             // 10h
+    { "COP1", handle_cop1_instruction },             // 11h
+    { "COP2", handle_cop2_instruction },             // 12h
+    { "COP3", handle_cop3_instruction },             // 13h
     { "N/A", undefined },         // 14h
     { "N/A", undefined },         // 15h
     { "N/A", undefined },         // 16h
@@ -114,7 +138,6 @@ const instruction primary_opcodes[0x40] = {
     { "N/A", undefined }          // 3Fh
 };
 
-
 const instruction secondary_opcodes[0x40] = {
     { "SLL", sll },               // 00h
     { "N/A", undefined },         // 01h
@@ -153,8 +176,8 @@ const instruction secondary_opcodes[0x40] = {
     { "SUB", sub },               // 22h
     { "SUBU", subu },             // 23h
     { "AND", and },               // 24h
-    { "OR", or },                 // 25h
-    { "XOR", xor },               // 26h
+    { "OR", op_or },                 // 25h
+    { "XOR", op_xor },               // 26h
     { "NOR", nor },               // 27h
     { "N/A", undefined },         // 28h
     { "N/A", undefined },         // 29h
@@ -181,36 +204,6 @@ const instruction secondary_opcodes[0x40] = {
     { "N/A", undefined },         // 3Eh
     { "N/A", undefined }          // 3Fh
 };
-
-/// <summary>
-/// Program counter
-/// </summary>
-uint32_t pc = 0xBFC00000;
-
-/// <summary>
-/// Multiply/divide high result
-/// </summary>
-uint32_t hi = 0;
-
-/// <summary>
-/// Multiply/divde low result
-/// </summary>
-uint32_t lo = 0;
-
-/// <summary>
-/// The 32 bit value of the currently executed opcode
-/// </summary>
-uint32_t current_opcode = 0;
-
-/// <summary>
-/// Whether a jump should be executed on the next instruction
-/// </summary>
-bool jmp_next_instr = false;
-
-/// <summary>
-/// The address to jump to
-/// </summary>
-uint32_t jmp_address = 0x00;
 
 void undefined()
 {
@@ -377,26 +370,6 @@ void lui()
     R(rt(current_opcode)) = upper_value;
 }
 
-void cop0()
-{
-    log_warning("Unhandled COP0 instruction\n");
-}
-
-void cop1()
-{
-    log_warning("Unhandled COP1 instruction\n");
-}
-
-void cop2()
-{
-    log_warning("Unhandled COP2 instruction\n");
-}
-
-void cop3()
-{
-    log_warning("Unhandled COP3 instruction\n");
-}
-
 void lb()
 {
     // Base register
@@ -530,7 +503,16 @@ void swl()
 
 void sw()
 {
-    log_warning("Unhandled instruction sw\n");
+    uint32_t base_addr = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
+    
+    int16_t offset = (int16_t)(current_opcode & 0xFFFF);
+    uint32_t address = base_addr + offset;
+
+    if ((address & 0b11) != 0)
+        log_error("Unaligned address exception with sw instruction!\n");
+    else
+        write_word(address, rt_val);
 }
 
 void swr()
