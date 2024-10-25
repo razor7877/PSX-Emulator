@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include "memory.h"
 #include "logging.h"
 
 #define R0 _registers.r0
@@ -548,5 +549,17 @@ void sltu()
 
 void handle_instruction()
 {
+    uint32_t next_opcode = read_word(pc);
 
+    // Get primary opcode from 6 highest bits
+    uint8_t primary_opcode = (next_opcode & 0xFC000000) >> 26;
+    // Get secondary opcode from 6 lowest bits
+    uint8_t secondary_opcode = next_opcode & 0x3F;
+
+    if (primary_opcode = 0x00)
+        ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
+    else
+        ((void (*)(void))primary_opcodes[primary_opcode].function)();
+
+    pc += 0x4;
 }

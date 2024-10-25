@@ -13,3 +13,5 @@ source_group("includes" FILES ${INCLUDES})
 
 # Add include folders so they are found by the compiler
 target_include_directories(PSX_Emulator PUBLIC includes)
+
+file(COPY roms DESTINATION ${PSX_Emulator_BINARY_DIR})

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdint.h>
+#include <stdio.h>
+
 #define WORD_SIZE 4
 #define KIB_SIZE 1024
 #define KIB_TO_WORD_SIZE (KIB_SIZE / WORD_SIZE)
@@ -26,3 +29,9 @@ uint32_t read_word(uint32_t address);
 /// <param name="address">The address to write to</param>
 /// <param name="value">The value to be written</param>
 void write_word(uint32_t address, uint32_t value);
+
+/// <summary>
+/// Loads the content of a file stream into the memory of the BIOS ROM
+/// </summary>
+/// <param name="bios_file">The file stream to be loaded, it should contain 512 KiB of binary data</param>
+void load_bios_into_mem(FILE* bios_file);

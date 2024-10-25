@@ -278,3 +278,8 @@ void write_word(uint32_t address, uint32_t value)
 
 	log_error("Attempted writing word outside of any memory segment! Address %x Value %x\n", address, value);
 }
+
+void load_bios_into_mem(FILE* bios_file)
+{
+	fread(&bios_rom, sizeof(uint8_t), 512 * KIB_SIZE, bios_file);
+}
