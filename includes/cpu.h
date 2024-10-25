@@ -4,22 +4,6 @@
 
 typedef struct
 {
-	uint32_t r0;
-	uint32_t r1;
-	uint32_t r2_3[2];
-	uint32_t r4_7[4];
-	uint32_t r8_15[8];
-	uint32_t r16_23[8];
-	uint32_t r24_25[2];
-	uint32_t r26_27[2];
-	uint32_t r28;
-	uint32_t r29;
-	uint32_t r30;
-	uint32_t r31;
-} registers;
-
-typedef struct
-{
 	const char* disassembly;
 	void* function;
 } instruction;

@@ -1,55 +1,50 @@
+#include <stdbool.h>
+
 #include "cpu.h"
 #include "memory.h"
 #include "logging.h"
 
-#define R0 _registers.r0
-#define R1 _registers.r1
-#define R2 _registers.r2_3[0]
-#define R3 _registers.r2_3[1]
-#define R4 _registers.r4_7[0]
-#define R5 _registers.r4_7[1]
-#define R6 _registers.r4_7[2]
-#define R7 _registers.r4_7[3]
-#define R8 _registers.r8_15[0]
-#define R9 _registers.r8_15[1]
-#define R10 _registers.r8_15[2]
-#define R11 _registers.r8_15[3]
-#define R12 _registers.r8_15[4]
-#define R13 _registers.r8_15[5]
-#define R14 _registers.r8_15[6]
-#define R15 _registers.r8_15[7]
-#define R16 _registers.r16_23[0]
-#define R17 _registers.r16_23[1]
-#define R18 _registers.r16_23[2]
-#define R19 _registers.r16_23[3]
-#define R20 _registers.r16_23[4]
-#define R21 _registers.r16_23[5]
-#define R22 _registers.r16_23[6]
-#define R23 _registers.r16_23[7]
-#define R24 _registers.r24_25[0]
-#define R25 _registers.r24_25[1]
-#define R26 _registers.r26_27[0]
-#define R27 _registers.r26_27[1]
-#define R28 _registers.r28
-#define R29 _registers.r29
-#define R30 _registers.r30
-#define R31 _registers.r31
+#define R0 _registers[0]
+#define R1 _registers[1]
+#define R2 _registers[2]
+#define R3 _registers[3]
+#define R4 _registers[4]
+#define R5 _registers[5]
+#define R6 _registers[6]
+#define R7 _registers[7]
+#define R8 _registers[8]
+#define R9 _registers[9]
+#define R10 _registers[10]
+#define R11 _registers[11]
+#define R12 _registers[12]
+#define R13 _registers[13]
+#define R14 _registers[14]
+#define R15 _registers[15]
+#define R16 _registers[16]
+#define R17 _registers[17]
+#define R18 _registers[18]
+#define R19 _registers[19]
+#define R20 _registers[20]
+#define R21 _registers[21]
+#define R22 _registers[22]
+#define R23 _registers[23]
+#define R24 _registers[24]
+#define R25 _registers[25]
+#define R26 _registers[26]
+#define R27 _registers[27]
+#define R28 _registers[28]
+#define R29 _registers[29]
+#define R30 _registers[30]
+#define R31 _registers[31]
+
+#define R(reg) _registers[reg]
+
+#define rs(value) ((value & 0x03E00000) >> 21)
+#define rt(value) ((value & 0x001F0000) >> 16)
+#define rd(value) ((value & 0x0000F800) >> 11)
 
 // Initialize registers
-registers _registers = {
-	.r0 = 0,
-	.r1 = 0,
-	.r2_3 = {0},
-	.r4_7 = {0},
-	.r8_15 = {0},
-	.r16_23 = {0},
-	.r24_25 = {0},
-	.r26_27 = {0},
-	.r28 = 0,
-	.r29 = 0,
-	.r30 = 0,
-	.r31 = 0
-};
+uint32_t _registers[32] = { 0 };
 
 const instruction primary_opcodes[0x40] = {
     { "SPECIAL", special },       // 00h
@@ -202,6 +197,21 @@ uint32_t hi = 0;
 /// </summary>
 uint32_t lo = 0;
 
+/// <summary>
+/// The 32 bit value of the currently executed opcode
+/// </summary>
+uint32_t current_opcode = 0;
+
+/// <summary>
+/// Whether a jump should be executed on the next instruction
+/// </summary>
+bool jmp_next_instr = false;
+
+/// <summary>
+/// The address to jump to
+/// </summary>
+uint32_t jmp_address = 0x00;
+
 void undefined()
 {
     log_error("Attempted to execute undefined opcode!\n");
@@ -219,42 +229,95 @@ void b_cond_z()
 
 void j()
 {
+    // Get 28 lower address bits from 26 lowest bits of the opcode
+    uint32_t instr_index = (current_opcode & 0x03FFFFFF) << 2;
+    uint32_t upper_bits = (pc + 0x4) & (0xF0000000);
 
+    jmp_address = upper_bits | instr_index;
+    jmp_next_instr = true;
 }
 
 void jal()
 {
+    // Save return address in R31
+    R31 = pc + 0x8;
 
+    // Get 28 lower address bits from 26 lowest bits of the opcode
+    uint32_t instr_index = (current_opcode & 0x03FFFFFF) << 2;
+    uint32_t upper_bits = (pc + 0x4) & (0xF0000000);
+
+    jmp_address = upper_bits | instr_index;
+    jmp_next_instr = true;
 }
 
 void beq()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
 
+    uint16_t offset_16 = current_opcode & 0xFFFF;
+    int32_t offset_18 = (int32_t)(offset_16 << 2);
+
+    if (rs_val == rt_val)
+        pc = pc + offset_18;
 }
 
 void bne()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
 
+    uint16_t offset_16 = current_opcode & 0xFFFF;
+    int32_t offset_18 = (int32_t)(offset_16 << 2);
+
+    if (rs_val != rt_val)
+        pc = pc + offset_18;
 }
 
 void blez()
 {
+    int32_t rs_val = (int32_t)R(rs(current_opcode));
 
+    uint16_t offset_16 = current_opcode & 0xFFFF;
+    int32_t offset_18 = (int32_t)(offset_16 << 2);
+
+    if (rs_val <= 0)
+        pc = pc + offset_18;
 }
 
 void bgtz()
 {
+    int32_t rs_val = R(rs(current_opcode));
 
+    uint16_t offset_16 = current_opcode & 0xFFFF;
+    int32_t offset_18 = (int32_t)(offset_16 << 2);
+
+    if (rs_val > 0)
+        pc = pc + offset_18;
 }
 
 void addi()
 {
+    uint32_t rs_val = R(rs(current_opcode));
 
+    int16_t signed_add = (int16_t)(current_opcode & 0xFFFF);
+    uint64_t sum = (uint64_t)(rs_val + signed_add);
+
+    if (sum > 0xFFFFFFFF)
+        log_warning("ADDI instruction resulted in overflow!\n");
+    else if (signed_add < 0 && sum < signed_add)
+        log_warning("ADDI instruction resulted in underflow!\n");
+    else
+        R(rd(current_opcode)) = sum;
 }
 
 void addiu()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
 
+    uint64_t sum = (uint64_t)(rs_val + rt_val);
+    R(rd(current_opcode)) = sum;
 }
 
 void slti()
@@ -269,7 +332,11 @@ void sltiu()
 
 void andi()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    // Get immediate from 16 lowest bits
+    uint16_t imm = current_opcode & 0xFFFF;
 
+    R(rt(current_opcode)) = rs_val & imm;
 }
 
 void ori()
@@ -289,32 +356,68 @@ void lui()
 
 void cop0()
 {
-
+    log_warning("Unhandled COP0 instruction\n");
 }
 
 void cop1()
 {
-
+    log_warning("Unhandled COP1 instruction\n");
 }
 
 void cop2()
 {
-
+    log_warning("Unhandled COP2 instruction\n");
 }
 
 void cop3()
 {
-
+    log_warning("Unhandled COP3 instruction\n");
 }
 
 void lb()
 {
+    // Base register
+    uint32_t base_addr = R(rs(current_opcode));
 
+    // Get signed offset from 16 lower bits
+    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+
+    int address = base_addr + offset;
+
+    // Get the word that contains the byte
+    uint32_t word = (uint32_t)read_word(address / 4);
+    uint8_t byte_index = address % 4;
+
+    // First byte in first 8 bits, second in the next 8 and so on
+    uint32_t mask = 0xFF000000 >> (byte_index * 8);
+    // Shift the value to bring it to an 8 bit value
+    int8_t byte = (word & mask) >> (24 - byte_index * 8);
+
+    int32_t sign_extended = (int32_t)byte;
+    R(rt(current_opcode)) = sign_extended;
 }
 
 void lh()
 {
+    // Base register
+    uint32_t base_addr = R(rs(current_opcode));
 
+    // Get signed offset from 16 lower bits
+    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+
+    int address = base_addr + offset;
+
+    // Get the word that contains the byte
+    uint32_t word = (uint32_t)read_word(address / 4);
+    uint16_t byte_index = address % 2;
+
+    // First byte in first 8 bits, second in the next 8 and so on
+    uint32_t mask = 0xFFFF0000 >> (byte_index * 16);
+    // Shift the value to bring it to an 8 bit value
+    int16_t half_word = (word & mask) >> (16 - byte_index * 16);
+
+    int32_t sign_extended = (int32_t)half_word;
+    R(rt(current_opcode)) = sign_extended;
 }
 
 void lwl()
@@ -324,17 +427,62 @@ void lwl()
 
 void lw()
 {
+    // Base register
+    uint32_t base_addr = R(rs(current_opcode));
 
+    // Get signed offset from 16 lower bits
+    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+
+    int address = base_addr + offset;
+
+    // Get the word
+    uint32_t word = (uint32_t)read_word(address / 4);
+
+    R(rt(current_opcode)) = word;
 }
 
 void lbu()
 {
+    // Base register
+    uint32_t base_addr = R(rs(current_opcode));
 
+    // Get signed offset from 16 lower bits
+    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+
+    int address = base_addr + offset;
+
+    // Get the word that contains the byte
+    uint32_t word = (uint32_t)read_word(address / 4);
+    uint8_t byte_index = address % 4;
+
+    // First byte in first 8 bits, second in the next 8 and so on
+    uint32_t mask = 0xFF000000 >> (byte_index * 8);
+    // Shift the value to bring it to an 8 bit value
+    uint8_t byte = (word & mask) >> (24 - byte_index * 8);
+
+    R(rt(current_opcode)) = byte;
 }
 
 void lhu()
 {
+    // Base register
+    uint32_t base_addr = R(rs(current_opcode));
 
+    // Get signed offset from 16 lower bits
+    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+
+    int address = base_addr + offset;
+
+    // Get the word that contains the byte
+    uint32_t word = (uint32_t)read_word(address / 4);
+    uint16_t byte_index = address % 2;
+
+    // First byte in first 8 bits, second in the next 8 and so on
+    uint32_t mask = 0xFFFF0000 >> (byte_index * 16);
+    // Shift the value to bring it to an 8 bit value
+    uint16_t half_word = (word & mask) >> (16 - byte_index * 16);
+
+    R(rt(current_opcode)) = half_word;
 }
 
 void lwr()
@@ -489,22 +637,52 @@ void multu()
 
 void div()
 {
+    int32_t rs_val = (int32_t)R(rs(current_opcode));
+    int32_t rt_val = (int32_t)R(rs(current_opcode));
 
+    if (rt_val == 0)
+        log_error("DIV instruction attempted divide by zero!\n");
+
+    uint32_t quotient = rs_val / rt_val;
+    uint32_t remainder = rs_val % rt_val;
+
+    hi = remainder;
+    lo = quotient;
 }
 
 void divu()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rs(current_opcode));
 
+    if (rt_val == 0)
+        log_error("DIV instruction attempted divide by zero!\n");
+
+    uint32_t quotient = rs_val / rt_val;
+    uint32_t remainder = rs_val % rt_val;
+
+    hi = remainder;
+    lo = quotient;
 }
 
 void add()
 {
+    uint64_t sum = R(rs(current_opcode)) + R(rt(current_opcode));
 
+    if (sum > 0xFFFFFFFF)
+        log_warning("ADD instruction resulted in overflow!\n");
+    else
+        R(rd(current_opcode)) = sum;
 }
 
 void addu()
 {
+    uint8_t rs_val = R(rs(current_opcode));
 
+    int16_t signed_add = (int16_t)(current_opcode & 0xFFFF);
+    uint64_t sum = (uint64_t)(rs_val + signed_add);
+
+    R(rd(current_opcode)) = sum;
 }
 
 void sub()
@@ -519,7 +697,10 @@ void subu()
 
 void and()
 {
+    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rt_val = R(rt(current_opcode));
 
+    R(rd(current_opcode)) = rs_val & rt_val;
 }
 
 void or()
@@ -549,17 +730,24 @@ void sltu()
 
 void handle_instruction()
 {
-    uint32_t next_opcode = read_word(pc);
+    current_opcode = read_word(pc);
 
     // Get primary opcode from 6 highest bits
-    uint8_t primary_opcode = (next_opcode & 0xFC000000) >> 26;
+    uint8_t primary_opcode = (current_opcode & 0xFC000000) >> 26;
     // Get secondary opcode from 6 lowest bits
-    uint8_t secondary_opcode = next_opcode & 0x3F;
+    uint8_t secondary_opcode = current_opcode & 0x3F;
 
     if (primary_opcode = 0x00)
         ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
     else
         ((void (*)(void))primary_opcodes[primary_opcode].function)();
 
-    pc += 0x4;
+    // Jump if we have a jump in delay slot, otherwise increment pc normally
+    if (jmp_next_instr)
+    {
+        jmp_next_instr = false;
+        pc = jmp_address;
+    }
+    else
+        pc += 0x4;
 }

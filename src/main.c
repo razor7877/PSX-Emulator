@@ -2,6 +2,7 @@
 
 #include "memory.h"
 #include "logging.h"
+#include "cpu.h"
 
 const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
 
@@ -32,6 +33,11 @@ int main(int argc, char** argv)
 	{
 		log_error("Couldn't load BIOS at startup!\n");
 		return -1;
+	}
+
+	for (;;)
+	{
+		handle_instruction();
 	}
 
 	return 0;
