@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <string.h>
 
 #include "memory.h"
 #include "logging.h"
@@ -43,6 +44,18 @@ uint32_t bios_rom[2048 * KIB_TO_WORD_SIZE] = { 0 };
 /// </summary>
 uint32_t cpu_cache_control[512 / WORD_SIZE] = { 0 };
 
+void clear_memory()
+{
+	memset(ram, 0, sizeof(ram));
+	memset(expansion_1, 0, sizeof(expansion_1));
+	memset(scratchpad, 0, sizeof(scratchpad));
+	memset(io_ports, 0, sizeof(io_ports));
+	memset(expansion_2, 0, sizeof(expansion_2));
+	memset(expansion_3, 0, sizeof(expansion_3));
+	memset(bios_rom, 0, sizeof(bios_rom));
+	memset(cpu_cache_control, 0, sizeof(cpu_cache_control));
+}
+
 /// <summary>
 /// Reads a word at the address in the KUSEG
 /// </summary>
@@ -53,7 +66,7 @@ static uint32_t read_word_kuseg(uint32_t address)
 	uint32_t word_index = address / WORD_SIZE;
 
 	if (address < RAM_SIZE) // Main RAM
-		return ram[word_index / WORD_SIZE];
+		return ram[word_index];
 	else if (address >= 0x1F000000 && address < 0x1F000000 + EXPANSION_1_SIZE) // Expansion region 1
 		return expansion_1[word_index - 0x1F000000 / WORD_SIZE];
 	else if (address >= 0x1F800000 && address < 0x1F800000 + SCRATCHPAD_SIZE) // Scratchpad (D-cache)

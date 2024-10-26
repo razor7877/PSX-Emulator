@@ -17,6 +17,11 @@
 #define CONTROL_REGISTERS_SIZE 512
 
 /// <summary>
+/// Clears all the system's memory
+/// </summary>
+void clear_memory();
+
+/// <summary>
 /// Reads a word at the address
 /// </summary>
 /// <param name="address">The address to be read</param>

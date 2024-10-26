@@ -3,6 +3,7 @@
 #include "memory.h"
 #include "logging.h"
 #include "cpu.h"
+#include "tests.h"
 
 const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
 
@@ -35,12 +36,13 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
+	test_memory();
 	test_instructions();
 
-	/*for (;;)
+	for (;;)
 	{
 		handle_instruction();
-	}*/
+	}
 
 	return 0;
 }

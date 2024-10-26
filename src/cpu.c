@@ -5,39 +5,6 @@
 #include "logging.h"
 #include "coprocessor.h"
 
-#define R0 _registers[0]
-#define R1 _registers[1]
-#define R2 _registers[2]
-#define R3 _registers[3]
-#define R4 _registers[4]
-#define R5 _registers[5]
-#define R6 _registers[6]
-#define R7 _registers[7]
-#define R8 _registers[8]
-#define R9 _registers[9]
-#define R10 _registers[10]
-#define R11 _registers[11]
-#define R12 _registers[12]
-#define R13 _registers[13]
-#define R14 _registers[14]
-#define R15 _registers[15]
-#define R16 _registers[16]
-#define R17 _registers[17]
-#define R18 _registers[18]
-#define R19 _registers[19]
-#define R20 _registers[20]
-#define R21 _registers[21]
-#define R22 _registers[22]
-#define R23 _registers[23]
-#define R24 _registers[24]
-#define R25 _registers[25]
-#define R26 _registers[26]
-#define R27 _registers[27]
-#define R28 _registers[28]
-#define R29 _registers[29]
-#define R30 _registers[30]
-#define R31 _registers[31]
-
 // Initialize registers
 uint32_t _registers[32] = { 0 };
 
@@ -218,77 +185,6 @@ void reset_cpu_state()
     jmp_address = 0;
 }
 
-void test_beq()
-{
-    _registers[0] = 0;
-    _registers[1] = 0;
-
-    current_opcode = 0b00010100000000010000000001000000;
-
-    uint32_t last_pc = pc;
-    beq();
-
-    if (pc != (last_pc + 0x100))
-        log_error("Incorrect BEQ behavior, did not trigger jump on equal registers\n");
-
-    reset_cpu_state();
-
-    _registers[0] = 0;
-    _registers[1] = 1;
-
-    // +0x100 offset
-    current_opcode = 0b00010100000000010000000001000000;
-
-    last_pc = pc;
-    beq();
-
-    if (pc == (last_pc + 0x100))
-        log_error("Incorrect BEQ behavior, triggered jump on different registers\n");
-
-    reset_cpu_state();
-
-    log_info("Finished testing BEQ\n");
-}
-
-void test_bne()
-{
-    _registers[0] = 0;
-    _registers[1] = 0;
-
-    current_opcode = 0b00010100000000010000000001000000;
-
-    uint32_t last_pc = pc;
-    bne();
-
-    if (pc == (last_pc + 0x100))
-        log_error("Incorrect BNE behavior, triggered jump on equal registers\n");
-
-    reset_cpu_state();
-
-    _registers[0] = 0;
-    _registers[1] = 1;
-
-    // +0x100 offset
-    current_opcode = 0b00010100000000010000000001000000;
-
-    last_pc = pc;
-    bne();
-
-    if (pc != (last_pc + 0x100))
-        log_error("Incorrect BNE behavior, did not trigger jump on different registers\n");
-
-    reset_cpu_state();
-
-    log_info("Finished testing BNE\n");
-}
-
-void test_instructions()
-{
-    log_info("Starting CPU instructions unit tests...\n");
-    test_beq();
-    test_bne();
-}
-
 void undefined()
 {
     log_error("Attempted to execute undefined opcode!\n");
@@ -383,14 +279,14 @@ void addi()
     uint32_t rs_val = R(rs(current_opcode));
 
     int16_t signed_add = (int16_t)(current_opcode & 0xFFFF);
-    uint64_t sum = (uint64_t)(rs_val + signed_add);
+    int64_t sum = (uint64_t)(rs_val + signed_add);
 
     if (sum > 0xFFFFFFFF)
         log_warning("ADDI instruction resulted in overflow!\n");
     else if (signed_add < 0 && sum < signed_add)
         log_warning("ADDI instruction resulted in underflow!\n");
     else
-        R(rd(current_opcode)) = sum;
+        R(rt(current_opcode)) = sum;
 }
 
 void addiu()
@@ -573,7 +469,17 @@ void lwr()
 
 void sb()
 {
-    log_warning("Unhandled instruction sb\n");
+    // Base register
+    uint32_t base_addr = R(rs(current_opcode));
+
+    // Get signed offset from 16 lower bits
+    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+
+    int address = base_addr + offset;
+
+    uint8_t value = R(rt(current_opcode)) & 0xFF;
+
+    write_word(address, value);
 }
 
 void sh()
@@ -846,7 +752,7 @@ void op_or()
     uint32_t rt_val = R(rt(current_opcode));
 
     uint32_t result = rs_val | rt_val;
-    R(rt(current_opcode)) = result;
+    R(rd(current_opcode)) = result;
 }
 
 void op_xor()
@@ -892,10 +798,10 @@ void handle_instruction()
     // Get secondary opcode from 6 lowest bits
     uint8_t secondary_opcode = current_opcode & 0x3F;
 
-    /*if (primary_opcode != 0x00)
+    if (primary_opcode != 0x00)
         log_info("Executing opcode %s\n\tAddress %x\n", primary_opcodes[primary_opcode].disassembly, pc);
     else
-        log_info("Executing opcode %s\n\tAddress %x\n", secondary_opcodes[secondary_opcode].disassembly, pc);*/
+        log_info("Executing opcode %s\n\tAddress %x\n", secondary_opcodes[secondary_opcode].disassembly, pc);
 
     if (primary_opcode == 0x00)
         ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
@@ -907,8 +813,8 @@ void handle_instruction()
         log_info("Reached pc 0x80030000\n");
     }
 
-    //char line[256];
-    //fgets(line, sizeof(line), stdin);
+    char line[256];
+    fgets(line, sizeof(line), stdin);
 
     // Jump if we have a jump in delay slot, otherwise increment pc normally
     if (jmp_next_instr)
