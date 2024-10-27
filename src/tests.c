@@ -47,6 +47,10 @@ void test_beq()
     uint32_t last_pc = pc;
     beq();
 
+    // NOP until we actually jump to the branch
+    current_opcode = 0;
+    handle_instruction();
+
     if (pc != (last_pc + 0x100))
         log_error("Incorrect BEQ behavior, did not trigger jump on equal registers\n");
 
@@ -60,6 +64,10 @@ void test_beq()
 
     last_pc = pc;
     beq();
+
+    // NOP until we actually jump to the branch
+    current_opcode = 0;
+    handle_instruction();
 
     if (pc == (last_pc + 0x100))
         log_error("Incorrect BEQ behavior, triggered jump on different registers\n");
@@ -79,6 +87,10 @@ void test_bne()
     uint32_t last_pc = pc;
     bne();
 
+    // NOP until we actually jump to the branch
+    current_opcode = 0;
+    handle_instruction();
+
     if (pc == (last_pc + 0x100))
         log_error("Incorrect BNE behavior, triggered jump on equal registers\n");
 
@@ -92,6 +104,10 @@ void test_bne()
 
     last_pc = pc;
     bne();
+    
+    // NOP until we actually jump to the branch
+    current_opcode = 0;
+    handle_instruction();
 
     if (pc != (last_pc + 0x100))
         log_error("Incorrect BNE behavior, did not trigger jump on different registers\n");
@@ -159,7 +175,19 @@ void test_sw()
 
 void test_addiu()
 {
+    R0 = 13;
+    uint16_t immediate = 37;
 
+    current_opcode = 0b00100100000000010000000000000000 | immediate;
+
+    addiu();
+
+    if (R1 != 50)
+        log_error("ADDIU instruction did not correctly calculate the result! Got %x\n", R1);
+
+    reset_cpu_state();
+
+    log_info("Finished testing ADDIU\n");
 }
 
 void test_j()
@@ -176,9 +204,6 @@ void test_or()
     current_opcode = 0b00000000000000010001000000100101;
 
     op_or();
-
-    uint32_t rtarget = R(rd(current_opcode));
-    uint32_t rnum = rd(current_opcode);
 
     if (R2 != 0xFFFFFFFF)
         log_error("OR instruction did not correctly calculate the result! Got %x\n", R2);
@@ -199,6 +224,7 @@ void test_instructions()
     test_ori();
     test_lui();
     test_sw();
+    test_addiu();
 }
 
 void test_memory()
@@ -234,7 +260,7 @@ void test_memory()
         write_word(0xA0000000 + i, value);
 
         if (read_word(0xA0000000 + i) != value)
-            log_error("KSEG0 RAM error, did not get written value back when reading at %x\n", i);
+            log_error("KSEG1 RAM error, did not get written value back when reading at %x\n", i);
 
         value++;
     }

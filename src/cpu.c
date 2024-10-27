@@ -31,7 +31,9 @@ uint32_t current_opcode = 0;
 /// <summary>
 /// Whether a jump should be executed on the next instruction
 /// </summary>
-bool jmp_next_instr = false;
+bool delay_jump = false;
+
+bool jump_next_instr = false;
 
 /// <summary>
 /// The address to jump to
@@ -181,7 +183,7 @@ void reset_cpu_state()
     hi = 0;
     lo = 0;
     current_opcode = 0;
-    jmp_next_instr = false;
+    delay_jump = false;
     jmp_address = 0;
 }
 
@@ -212,7 +214,7 @@ void j()
     uint32_t upper_bits = (pc + 0x4) & (0xF0000000);
 
     jmp_address = upper_bits | instr_index;
-    jmp_next_instr = true;
+    delay_jump = true;
 }
 
 void jal()
@@ -225,7 +227,7 @@ void jal()
     uint32_t upper_bits = (pc + 0x4) & (0xF0000000);
 
     jmp_address = upper_bits | instr_index;
-    jmp_next_instr = true;
+    delay_jump = true;
 }
 
 void beq()
@@ -237,7 +239,10 @@ void beq()
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val == rt_val)
-        pc = pc + offset_18;
+    {
+        delay_jump = true;
+        jmp_address = pc + offset_18;
+    }
 }
 
 void bne()
@@ -245,11 +250,14 @@ void bne()
     uint32_t rs_val = R(rs(current_opcode));
     uint32_t rt_val = R(rt(current_opcode));
 
-    uint16_t offset_16 = current_opcode & 0xFFFF;
+    int16_t offset_16 = current_opcode & 0xFFFF;
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val != rt_val)
-        pc = pc + offset_18;
+    {
+        delay_jump = true;
+        jmp_address = pc + offset_18;
+    }
 }
 
 void blez()
@@ -260,7 +268,10 @@ void blez()
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val <= 0)
-        pc = pc + offset_18;
+    {
+        delay_jump = true;
+        jmp_address = pc + offset_18;
+    }
 }
 
 void bgtz()
@@ -271,7 +282,10 @@ void bgtz()
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val > 0)
-        pc = pc + offset_18;
+    {
+        delay_jump = true;
+        jmp_address = pc + offset_18;
+    }
 }
 
 void addi()
@@ -296,7 +310,7 @@ void addiu()
     int16_t signed_add = (int16_t)(current_opcode & 0xFFFF);
 
     uint64_t sum = (uint64_t)(rs_val + signed_add);
-    R(rd(current_opcode)) = sum;
+    R(rt(current_opcode)) = sum;
 }
 
 void slti()
@@ -504,6 +518,8 @@ void sw()
         log_error("Unaligned address exception with sw instruction!\n");
     else
         write_word(address, rt_val);
+
+    log_debug("Store word %x at address %x\n", rt_val, address);
 }
 
 void swr()
@@ -604,7 +620,7 @@ void srav()
 void jr()
 {
     jmp_address = R(rs(current_opcode));
-    jmp_next_instr = true;
+    delay_jump = true;
 }
 
 void jalr()
@@ -613,7 +629,7 @@ void jalr()
     R(rd(current_opcode)) = pc + 0x8;
 
     jmp_address = R(rs(current_opcode));
-    jmp_next_instr = true;
+    delay_jump = true;
 }
 
 void syscall()
@@ -791,6 +807,7 @@ void sltu()
 
 void handle_instruction()
 {
+    R0 = 0;
     current_opcode = read_word(pc);
 
     // Get primary opcode from 6 highest bits
@@ -798,10 +815,16 @@ void handle_instruction()
     // Get secondary opcode from 6 lowest bits
     uint8_t secondary_opcode = current_opcode & 0x3F;
 
-    if (primary_opcode != 0x00)
-        log_info("Executing opcode %s\n\tAddress %x\n", primary_opcodes[primary_opcode].disassembly, pc);
-    else
-        log_info("Executing opcode %s\n\tAddress %x\n", secondary_opcodes[secondary_opcode].disassembly, pc);
+    char* disassembly = primary_opcodes[primary_opcode].disassembly;
+    if (primary_opcode == 0x00)
+        disassembly = secondary_opcodes[secondary_opcode].disassembly;
+
+    log_info("Executing opcode %s - %x\n\tAddress %x\n\tRS(r%d): %x RT(r%d): %x RD(r%d): %x\n",
+        disassembly, current_opcode, pc,
+        rs(current_opcode), R(rs(current_opcode)),
+        rt(current_opcode), R(rt(current_opcode)),
+        rd(current_opcode), R(rd(current_opcode))
+    );
 
     if (primary_opcode == 0x00)
         ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
@@ -809,17 +832,15 @@ void handle_instruction()
         ((void (*)(void))primary_opcodes[primary_opcode].function)();
 
     if (pc == 0x80030000)
-    {
         log_info("Reached pc 0x80030000\n");
-    }
 
     char line[256];
     fgets(line, sizeof(line), stdin);
 
     // Jump if we have a jump in delay slot, otherwise increment pc normally
-    if (jmp_next_instr)
+    if (delay_jump)
     {
-        jmp_next_instr = false;
+        delay_jump = false;
         pc = jmp_address;
     }
     else

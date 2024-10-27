@@ -30,14 +30,14 @@ static int load_bios(const char* path)
 
 int main(int argc, char** argv)
 {
+	test_memory();
+	test_instructions();
+
 	if (load_bios(bios_path) != 0)
 	{
 		log_error("Couldn't load BIOS at startup!\n");
 		return -1;
 	}
-
-	test_memory();
-	test_instructions();
 
 	for (;;)
 	{
