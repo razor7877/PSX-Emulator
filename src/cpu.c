@@ -4,6 +4,7 @@
 #include "memory.h"
 #include "logging.h"
 #include "coprocessor.h"
+#include "debug.h"
 
 cpu cpu_state = {
     .registers = {0},
@@ -164,6 +165,7 @@ void reset_cpu_state()
 
 void undefined()
 {
+    debug_state.in_debug = true;
     log_error("Attempted to execute undefined opcode!\n");
 }
 
@@ -388,6 +390,7 @@ void lh()
 
 void lwl()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction lwl\n");
 }
 
@@ -453,6 +456,7 @@ void lhu()
 
 void lwr()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction lwr\n");
 }
 
@@ -491,6 +495,7 @@ void sh()
 
 void swl()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction swl\n");
 }
 
@@ -512,46 +517,55 @@ void sw()
 
 void swr()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction swr\n");
 }
 
 void lwc0()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction LWC0\n");
 }
 
 void lwc1()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction LWC1\n");
 }
 
 void lwc2()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction LWC2\n");
 }
 
 void lwc3()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction LWC3\n");
 }
 
 void swc0()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction SWC0\n");
 }
 
 void swc1()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction SWC1\n");
 }
 
 void swc2()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction SWC2\n");
 }
 
 void swc3()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled instruction SWC3\n");
 }
 
@@ -622,11 +636,13 @@ void jalr()
 
 void syscall()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled syscall instruction!\n");
 }
 
 void op_break()
 {
+    debug_state.in_debug = true;
     log_warning("Unhandled break instruction!\n");
 }
 
@@ -712,12 +728,10 @@ void add()
 
 void addu()
 {
-    uint8_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
-    int16_t signed_add = (int16_t)(cpu_state.current_opcode & 0xFFFF);
-    uint64_t sum = (uint64_t)(rs_val + signed_add);
-
-    R(rd(cpu_state.current_opcode)) = sum;
+    R(rd(cpu_state.current_opcode)) = rs_val + rt_val;
 }
 
 void sub()
@@ -805,11 +819,9 @@ static void print_debug_info(uint8_t primary_opcode, uint8_t secondary_opcode)
         rt(cpu_state.current_opcode), R(rt(cpu_state.current_opcode)),
         rd(cpu_state.current_opcode), R(rd(cpu_state.current_opcode))
     );
-
-    log_warning("Return address r31 %x\n", R31);
 }
 
-void handle_instruction()
+void handle_instruction(bool debug_info)
 {
     R0 = 0;
     // Decode next instruction
@@ -820,7 +832,7 @@ void handle_instruction()
     // Get secondary opcode from 6 lowest bits
     uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
 
-    if (cpu_state.pc > 0xBFC07000)
+    if (debug_info)
         print_debug_info(primary_opcode, secondary_opcode);
 
     // Jump if we have a jump in delay slot, otherwise increment pc normally

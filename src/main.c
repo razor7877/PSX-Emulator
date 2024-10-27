@@ -41,16 +41,19 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	add_code_breakpoint(0xBFC06F04);
-	add_code_breakpoint(0x80030000);
-	add_code_breakpoint(0xBFC07124);
+	// BIOS finished execution
+	add_breakpoint(0x80030000, true, false);
+
+	add_breakpoint(0xB0, true, false);
+
+	add_breakpoint(0x00, false, true);
 
 	for (;;)
 	{
 		if (!debug_state.in_debug)
 		{
-			handle_instruction();
-			check_break_address(cpu_state.pc);
+			handle_instruction(false);
+			check_code_breakpoints(cpu_state.pc);
 		}
 		else
 			handle_debug_input();

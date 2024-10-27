@@ -7,7 +7,15 @@
 
 typedef struct
 {
-	uint32_t code_breakpoints[MAX_BREAKPOINTS];
+	uint32_t address;
+	bool break_on_data;
+	bool break_on_code;
+	bool enabled;
+} breakpoint;
+
+typedef struct
+{
+	breakpoint code_breakpoints[MAX_BREAKPOINTS];
 	int breakpoint_count;
 	bool in_debug;
 } debug_struct;
@@ -23,17 +31,22 @@ void handle_debug_input();
 /// Checks an address and triggers breakpoints if necessary
 /// </summary>
 /// <param name="address">The address to check</param>
-/// <returns></returns>
-void check_break_address(uint32_t address);
+void check_code_breakpoints(uint32_t address);
+
+/// <summary>
+/// Checks an address and triggers breakpoints if necessary
+/// </summary>
+/// <param name="address">The address to check</param>
+void check_data_breakpoints(uint32_t address);
 
 /// <summary>
 /// Adds a new code breakpoint
 /// </summary>
 /// <param name="address">The address to break on</param>
-void add_code_breakpoint(uint32_t address);
+void add_breakpoint(uint32_t address, bool break_on_code, bool break_on_data);
 
 /// <summary>
 /// Removes a code breakpoint
 /// </summary>
 /// <param name="index">The index of the breakpoint to remove</param>
-void delete_code_breakpoint(int index);
+void delete_breakpoint(int index);
