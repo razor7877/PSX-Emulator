@@ -1,45 +1,46 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
-#define R(reg) _registers[reg]
+#define R(reg) cpu_state.registers[reg]
 #define rs(value) ((value & 0x03E00000) >> 21)
 #define rt(value) ((value & 0x001F0000) >> 16)
 #define rd(value) ((value & 0x0000F800) >> 11)
 #define imm5(value) ((value & 0x000007C0) >> 6)
 
-#define R0 _registers[0]
-#define R1 _registers[1]
-#define R2 _registers[2]
-#define R3 _registers[3]
-#define R4 _registers[4]
-#define R5 _registers[5]
-#define R6 _registers[6]
-#define R7 _registers[7]
-#define R8 _registers[8]
-#define R9 _registers[9]
-#define R10 _registers[10]
-#define R11 _registers[11]
-#define R12 _registers[12]
-#define R13 _registers[13]
-#define R14 _registers[14]
-#define R15 _registers[15]
-#define R16 _registers[16]
-#define R17 _registers[17]
-#define R18 _registers[18]
-#define R19 _registers[19]
-#define R20 _registers[20]
-#define R21 _registers[21]
-#define R22 _registers[22]
-#define R23 _registers[23]
-#define R24 _registers[24]
-#define R25 _registers[25]
-#define R26 _registers[26]
-#define R27 _registers[27]
-#define R28 _registers[28]
-#define R29 _registers[29]
-#define R30 _registers[30]
-#define R31 _registers[31]
+#define R0 cpu_state.registers[0]
+#define R1 cpu_state.registers[1]
+#define R2 cpu_state.registers[2]
+#define R3 cpu_state.registers[3]
+#define R4 cpu_state.registers[4]
+#define R5 cpu_state.registers[5]
+#define R6 cpu_state.registers[6]
+#define R7 cpu_state.registers[7]
+#define R8 cpu_state.registers[8]
+#define R9 cpu_state.registers[9]
+#define R10 cpu_state.registers[10]
+#define R11 cpu_state.registers[11]
+#define R12 cpu_state.registers[12]
+#define R13 cpu_state.registers[13]
+#define R14 cpu_state.registers[14]
+#define R15 cpu_state.registers[15]
+#define R16 cpu_state.registers[16]
+#define R17 cpu_state.registers[17]
+#define R18 cpu_state.registers[18]
+#define R19 cpu_state.registers[19]
+#define R20 cpu_state.registers[20]
+#define R21 cpu_state.registers[21]
+#define R22 cpu_state.registers[22]
+#define R23 cpu_state.registers[23]
+#define R24 cpu_state.registers[24]
+#define R25 cpu_state.registers[25]
+#define R26 cpu_state.registers[26]
+#define R27 cpu_state.registers[27]
+#define R28 cpu_state.registers[28]
+#define R29 cpu_state.registers[29]
+#define R30 cpu_state.registers[30]
+#define R31 cpu_state.registers[31]
 
 typedef struct
 {
@@ -47,9 +48,43 @@ typedef struct
 	void* function;
 } instruction;
 
-extern uint32_t _registers[32];
-extern uint32_t current_opcode;
-extern uint32_t pc;
+typedef struct
+{
+	// r0-31
+	uint32_t registers[32];
+
+	/// <summary>
+	/// The 32 bit value of the currently executed opcode
+	/// </summary>
+	uint32_t current_opcode;
+
+	/// <summary>
+	/// CPU Program counter
+	/// </summary>
+	uint32_t pc;
+
+	/// <summary>
+	/// Multiply/divide high result
+	/// </summary>
+	uint32_t hi;
+
+	/// <summary>
+	/// Multiply/divide low result
+	/// </summary>
+	uint32_t lo;
+
+	/// <summary>
+	/// Whether a jump should be executed on the next instruction
+	/// </summary>
+	bool delay_jump;
+
+	/// <summary>
+	/// The address to jump to
+	/// </summary>
+	uint32_t jmp_address;
+} cpu;
+
+extern cpu cpu_state;
 
 void reset_cpu_state();
 

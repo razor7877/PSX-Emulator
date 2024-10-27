@@ -21,27 +21,27 @@ void cfc()
 
 void mtc()
 {
-    uint32_t dest_reg = rd(current_opcode);
+    uint32_t dest_reg = rd(cpu_state.current_opcode);
 
     if (dest_reg > 31)
         log_error("MFC0 attempted to move to register outside of data registers\n");
     else
-        CPR0(dest_reg) = R(rt(current_opcode));
+        CPR0(dest_reg) = R(rt(cpu_state.current_opcode));
 }
 
 void ctc()
 {
-    uint32_t dest_reg = rd(current_opcode);
+    uint32_t dest_reg = rd(cpu_state.current_opcode);
 
     if (dest_reg < 32 || dest_reg > 63)
         log_error("CFC0 attempted to move to register outside of control registers\n");
     else
-        CPR0(dest_reg) = R(rt(current_opcode));
+        CPR0(dest_reg) = R(rt(cpu_state.current_opcode));
 }
 
 void handle_cop0_instruction()
 {
-    uint8_t opcode = cop0_code(current_opcode);
+    uint8_t opcode = cop0_code(cpu_state.current_opcode);
 
     switch (opcode)
     {
@@ -68,7 +68,7 @@ void handle_cop0_instruction()
         break;
 
     default:
-        log_error("Unhandled COP0 instruction with opcode %x\n", current_opcode);
+        log_error("Unhandled COP0 instruction with opcode %x\n", cpu_state.current_opcode);
         break;
     }
 }

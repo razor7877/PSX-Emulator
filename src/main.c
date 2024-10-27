@@ -42,6 +42,12 @@ int main(int argc, char** argv)
 	for (;;)
 	{
 		handle_instruction();
+
+		if (cpu_state.pc == 0x80030000)
+			log_info("Reached pc 0x80030000\n");
+
+		//char line[256];
+		//fgets(line, sizeof(line), stdin);
 	}
 
 	return 0;

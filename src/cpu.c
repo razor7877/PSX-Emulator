@@ -5,40 +5,15 @@
 #include "logging.h"
 #include "coprocessor.h"
 
-// Initialize registers
-uint32_t _registers[32] = { 0 };
-
-/// <summary>
-/// Program counter
-/// </summary>
-uint32_t pc = 0xBFC00000;
-
-/// <summary>
-/// Multiply/divide high result
-/// </summary>
-uint32_t hi = 0;
-
-/// <summary>
-/// Multiply/divde low result
-/// </summary>
-uint32_t lo = 0;
-
-/// <summary>
-/// The 32 bit value of the currently executed opcode
-/// </summary>
-uint32_t current_opcode = 0;
-
-/// <summary>
-/// Whether a jump should be executed on the next instruction
-/// </summary>
-bool delay_jump = false;
-
-bool jump_next_instr = false;
-
-/// <summary>
-/// The address to jump to
-/// </summary>
-uint32_t jmp_address = 0x00;
+cpu cpu_state = {
+    .registers = {0},
+    .current_opcode = 0x00,
+    .pc = 0xBFC00000,
+    .hi =  0,
+    .lo =  0,
+    .delay_jump = false,
+    .jmp_address = 0x00
+};
 
 const instruction primary_opcodes[0x40] = {
     { "SPECIAL", NULL },       // 00h
@@ -177,14 +152,14 @@ const instruction secondary_opcodes[0x40] = {
 void reset_cpu_state()
 {
     for (int i = 0; i < 32; i++)
-        _registers[i] = 0;
+        cpu_state.registers[i] = 0;
 
-    pc = 0xBFC00000;
-    hi = 0;
-    lo = 0;
-    current_opcode = 0;
-    delay_jump = false;
-    jmp_address = 0;
+    cpu_state.pc = 0xBFC00000;
+    cpu_state.hi =  0;
+    cpu_state.lo =  0;
+    cpu_state.current_opcode = 0;
+    cpu_state.delay_jump = false;
+    cpu_state.jmp_address = 0;
 }
 
 void undefined()
@@ -194,105 +169,105 @@ void undefined()
 
 void b_cond_z()
 {
-    int32_t rs_val = (int32_t)R(rs(current_opcode));
+    int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
 
-    R31 = pc + 0x8;
+    R31 = cpu_state.pc + 0x8;
 
     if (rs_val > 0)
     {
-        uint16_t offset_16 = current_opcode & 0xFFFF;
+        uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
         int32_t offset_18 = (int32_t)(offset_16 << 2);
 
-        pc = pc + offset_18;
+        cpu_state.pc = cpu_state.pc + offset_18;
     }
 }
 
 void j()
 {
     // Get 28 lower address bits from 26 lowest bits of the opcode
-    uint32_t instr_index = (current_opcode & 0x03FFFFFF) << 2;
-    uint32_t upper_bits = (pc + 0x4) & (0xF0000000);
+    uint32_t instr_index = (cpu_state.current_opcode & 0x03FFFFFF) << 2;
+    uint32_t upper_bits = (cpu_state.pc + 0x4) & (0xF0000000);
 
-    jmp_address = upper_bits | instr_index;
-    delay_jump = true;
+    cpu_state.jmp_address = upper_bits | instr_index;
+    cpu_state.delay_jump = true;
 }
 
 void jal()
 {
     // Save return address in R31
-    R31 = pc + 0x8;
+    R31 = cpu_state.pc + 0x8;
 
     // Get 28 lower address bits from 26 lowest bits of the opcode
-    uint32_t instr_index = (current_opcode & 0x03FFFFFF) << 2;
-    uint32_t upper_bits = (pc + 0x4) & (0xF0000000);
+    uint32_t instr_index = (cpu_state.current_opcode & 0x03FFFFFF) << 2;
+    uint32_t upper_bits = (cpu_state.pc + 0x4) & (0xF0000000);
 
-    jmp_address = upper_bits | instr_index;
-    delay_jump = true;
+    cpu_state.jmp_address = upper_bits | instr_index;
+    cpu_state.delay_jump = true;
 }
 
 void beq()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
-    uint16_t offset_16 = current_opcode & 0xFFFF;
+    uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val == rt_val)
     {
-        delay_jump = true;
-        jmp_address = pc + offset_18;
+        cpu_state.delay_jump = true;
+        cpu_state.jmp_address = cpu_state.pc + offset_18;
     }
 }
 
 void bne()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
-    int16_t offset_16 = current_opcode & 0xFFFF;
+    int16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val != rt_val)
     {
-        delay_jump = true;
-        jmp_address = pc + offset_18;
+        cpu_state.delay_jump = true;
+        cpu_state.jmp_address = cpu_state.pc + offset_18;
     }
 }
 
 void blez()
 {
-    int32_t rs_val = (int32_t)R(rs(current_opcode));
+    int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
 
-    uint16_t offset_16 = current_opcode & 0xFFFF;
+    uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val <= 0)
     {
-        delay_jump = true;
-        jmp_address = pc + offset_18;
+        cpu_state.delay_jump = true;
+        cpu_state.jmp_address = cpu_state.pc + offset_18;
     }
 }
 
 void bgtz()
 {
-    int32_t rs_val = R(rs(current_opcode));
+    int32_t rs_val = R(rs(cpu_state.current_opcode));
 
-    uint16_t offset_16 = current_opcode & 0xFFFF;
+    uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val > 0)
     {
-        delay_jump = true;
-        jmp_address = pc + offset_18;
+        cpu_state.delay_jump = true;
+        cpu_state.jmp_address = cpu_state.pc + offset_18;
     }
 }
 
 void addi()
 {
-    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
 
-    int16_t signed_add = (int16_t)(current_opcode & 0xFFFF);
+    int16_t signed_add = (int16_t)(cpu_state.current_opcode & 0xFFFF);
     int64_t sum = (uint64_t)(rs_val + signed_add);
 
     if (sum > 0xFFFFFFFF)
@@ -300,78 +275,78 @@ void addi()
     else if (signed_add < 0 && sum < signed_add)
         log_warning("ADDI instruction resulted in underflow!\n");
     else
-        R(rt(current_opcode)) = sum;
+        R(rt(cpu_state.current_opcode)) = sum;
 }
 
 void addiu()
 {
-    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
 
-    int16_t signed_add = (int16_t)(current_opcode & 0xFFFF);
+    int16_t signed_add = (int16_t)(cpu_state.current_opcode & 0xFFFF);
 
     uint64_t sum = (uint64_t)(rs_val + signed_add);
-    R(rt(current_opcode)) = sum;
+    R(rt(cpu_state.current_opcode)) = sum;
 }
 
 void slti()
 {
-    int32_t rs_val = (int32_t)R(rs(current_opcode));
-    int16_t immediate = (int16_t)(current_opcode & 0xFFFF);
+    int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
+    int16_t immediate = (int16_t)(cpu_state.current_opcode & 0xFFFF);
 
-    R(rt(current_opcode)) = rs_val < immediate;
+    R(rt(cpu_state.current_opcode)) = rs_val < immediate;
 }
 
 void sltiu()
 {
-    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
     // Sign extend the immediate but use it as an unsigned value
-    uint32_t immediate = (int32_t)(current_opcode & 0xFFFF);
+    uint32_t immediate = (int32_t)(cpu_state.current_opcode & 0xFFFF);
 
-    R(rt(current_opcode)) = rs_val < immediate;
+    R(rt(cpu_state.current_opcode)) = rs_val < immediate;
 }
 
 void andi()
 {
-    uint32_t rs_val = R(rs(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
     // Get immediate from 16 lowest bits
-    uint16_t imm = current_opcode & 0xFFFF;
+    uint16_t imm = cpu_state.current_opcode & 0xFFFF;
 
-    R(rt(current_opcode)) = rs_val & imm;
+    R(rt(cpu_state.current_opcode)) = rs_val & imm;
 }
 
 void ori()
 {
-    uint16_t immediate = current_opcode & 0xFFFF;
-    uint32_t rs_val = R(rs(current_opcode));
+    uint16_t immediate = cpu_state.current_opcode & 0xFFFF;
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
 
     uint32_t result = rs_val | immediate;
-    R(rt(current_opcode)) = result;
+    R(rt(cpu_state.current_opcode)) = result;
 }
 
 void xori()
 {
-    uint16_t immediate = current_opcode & 0xFFFF;
-    uint32_t rs_val = R(rs(current_opcode));
+    uint16_t immediate = cpu_state.current_opcode & 0xFFFF;
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
 
     uint32_t result = rs_val ^ immediate;
-    R(rt(current_opcode)) = result;
+    R(rt(cpu_state.current_opcode)) = result;
 }
 
 void lui()
 {
-    uint16_t immediate = current_opcode & 0xFFFF;
+    uint16_t immediate = cpu_state.current_opcode & 0xFFFF;
     uint32_t upper_value = immediate << 16;
 
-    R(rt(current_opcode)) = upper_value;
+    R(rt(cpu_state.current_opcode)) = upper_value;
 }
 
 void lb()
 {
     // Base register
-    uint32_t base_addr = R(rs(current_opcode));
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
 
     // Get signed offset from 16 lower bits
-    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
 
     int address = base_addr + offset;
 
@@ -385,16 +360,16 @@ void lb()
     int8_t byte = (word & mask) >> (24 - byte_index * 8);
 
     int32_t sign_extended = (int32_t)byte;
-    R(rt(current_opcode)) = sign_extended;
+    R(rt(cpu_state.current_opcode)) = sign_extended;
 }
 
 void lh()
 {
     // Base register
-    uint32_t base_addr = R(rs(current_opcode));
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
 
     // Get signed offset from 16 lower bits
-    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
 
     int address = base_addr + offset;
 
@@ -408,7 +383,7 @@ void lh()
     int16_t half_word = (word & mask) >> (16 - byte_index * 16);
 
     int32_t sign_extended = (int32_t)half_word;
-    R(rt(current_opcode)) = sign_extended;
+    R(rt(cpu_state.current_opcode)) = sign_extended;
 }
 
 void lwl()
@@ -419,26 +394,26 @@ void lwl()
 void lw()
 {
     // Base register
-    uint32_t base_addr = R(rs(current_opcode));
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
 
     // Get signed offset from 16 lower bits
-    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
 
     uint32_t address = base_addr + offset;
 
     // Get the word
     uint32_t word = (uint32_t)read_word(address);
 
-    R(rt(current_opcode)) = word;
+    R(rt(cpu_state.current_opcode)) = word;
 }
 
 void lbu()
 {
     // Base register
-    uint32_t base_addr = R(rs(current_opcode));
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
 
     // Get signed offset from 16 lower bits
-    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
 
     int address = base_addr + offset;
 
@@ -451,16 +426,16 @@ void lbu()
     // Shift the value to bring it to an 8 bit value
     uint8_t byte = (word & mask) >> (24 - byte_index * 8);
 
-    R(rt(current_opcode)) = byte;
+    R(rt(cpu_state.current_opcode)) = byte;
 }
 
 void lhu()
 {
     // Base register
-    uint32_t base_addr = R(rs(current_opcode));
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
 
     // Get signed offset from 16 lower bits
-    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
 
     int address = base_addr + offset;
 
@@ -473,7 +448,7 @@ void lhu()
     // Shift the value to bring it to an 8 bit value
     uint16_t half_word = (word & mask) >> (16 - byte_index * 16);
 
-    R(rt(current_opcode)) = half_word;
+    R(rt(cpu_state.current_opcode)) = half_word;
 }
 
 void lwr()
@@ -484,14 +459,14 @@ void lwr()
 void sb()
 {
     // Base register
-    uint32_t base_addr = R(rs(current_opcode));
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
 
     // Get signed offset from 16 lower bits
-    int16_t offset = (int16_t)(current_opcode & 0x0000FFFF);
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
 
     int address = base_addr + offset;
 
-    uint8_t value = R(rt(current_opcode)) & 0xFF;
+    uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFF;
 
     write_word(address, value);
 }
@@ -508,10 +483,10 @@ void swl()
 
 void sw()
 {
-    uint32_t base_addr = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
     
-    int16_t offset = (int16_t)(current_opcode & 0xFFFF);
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0xFFFF);
     uint32_t address = base_addr + offset;
 
     if ((address & 0b11) != 0)
@@ -569,67 +544,67 @@ void swc3()
 
 void sll()
 {
-    uint8_t immediate = imm5(current_opcode);
-    uint32_t rt_val = R(rt(current_opcode));
+    uint8_t immediate = imm5(cpu_state.current_opcode);
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
-    R(rd(current_opcode)) = rt_val << immediate;
+    R(rd(cpu_state.current_opcode)) = rt_val << immediate;
 }
 
 void srl()
 {
-    uint8_t immediate = imm5(current_opcode);
-    uint32_t rt_val = R(rt(current_opcode));
+    uint8_t immediate = imm5(cpu_state.current_opcode);
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
-    R(rd(current_opcode)) = rt_val >> immediate;
+    R(rd(cpu_state.current_opcode)) = rt_val >> immediate;
 }
 
 void sra()
 {
-    uint8_t immediate = imm5(current_opcode);
-    int32_t rt_val = (int32_t)R(rt(current_opcode));
+    uint8_t immediate = imm5(cpu_state.current_opcode);
+    int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
     // TODO : Make sure this does an arithmetic shift
-    R(rd(current_opcode)) = rt_val >> immediate;
+    R(rd(cpu_state.current_opcode)) = rt_val >> immediate;
 }
 
 void sllv()
 {
-    uint8_t rs_val_5 = R(rs(current_opcode)) & 0b11111;
-    uint32_t rt_val = R(rt(current_opcode));
+    uint8_t rs_val_5 = R(rs(cpu_state.current_opcode)) & 0b11111;
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
-    R(rd(current_opcode)) = rt_val << rs_val_5;
+    R(rd(cpu_state.current_opcode)) = rt_val << rs_val_5;
 }
 
 void srlv()
 {
-    uint8_t rs_val_5 = R(rs(current_opcode)) & 0b11111;
-    uint32_t rt_val = R(rt(current_opcode));
+    uint8_t rs_val_5 = R(rs(cpu_state.current_opcode)) & 0b11111;
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
-    R(rd(current_opcode)) = rt_val >> rs_val_5;
+    R(rd(cpu_state.current_opcode)) = rt_val >> rs_val_5;
 }
 
 void srav()
 {
-    uint8_t rs_val_5 = R(rs(current_opcode)) & 0b11111;
-    int32_t rt_val = (int32_t)R(rt(current_opcode));
+    uint8_t rs_val_5 = R(rs(cpu_state.current_opcode)) & 0b11111;
+    int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
     // TODO : Make sure this does an arithmetic shift
-    R(rd(current_opcode)) = rt_val >> rs_val_5;
+    R(rd(cpu_state.current_opcode)) = rt_val >> rs_val_5;
 }
 
 void jr()
 {
-    jmp_address = R(rs(current_opcode));
-    delay_jump = true;
+    cpu_state.jmp_address = R(rs(cpu_state.current_opcode));
+    cpu_state.delay_jump = true;
 }
 
 void jalr()
 {
     // Save return address in R31
-    R(rd(current_opcode)) = pc + 0x8;
+    R(rd(cpu_state.current_opcode)) = cpu_state.pc + 0x8;
 
-    jmp_address = R(rs(current_opcode));
-    delay_jump = true;
+    cpu_state.jmp_address = R(rs(cpu_state.current_opcode));
+    cpu_state.delay_jump = true;
 }
 
 void syscall()
@@ -644,48 +619,48 @@ void op_break()
 
 void mfhi()
 {
-    R(rd(current_opcode)) = hi;
+    R(rd(cpu_state.current_opcode)) = cpu_state.hi;
 }
 
 void mthi()
 {
-    hi = R(rs(current_opcode));
+    cpu_state.hi =  R(rs(cpu_state.current_opcode));
 }
 
 void mflo()
 {
-    R(rd(current_opcode)) = lo;
+    R(rd(cpu_state.current_opcode)) = cpu_state.lo;
 }
 
 void mtlo()
 {
-    lo = R(rs(current_opcode));
+    cpu_state.lo =  R(rs(cpu_state.current_opcode));
 }
 
 void mult()
 {
-    int32_t rs_val = (int32_t)R(rs(current_opcode));
-    int32_t rt_val = (int32_t)R(rt(current_opcode));
+    int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
+    int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
     int64_t mult_result = rs_val * rt_val;
-    hi = (mult_result & 0xFFFFFFFF00000000) >> 32;
-    lo = mult_result & 0xFFFFFFFF;
+    cpu_state.hi =  (mult_result & 0xFFFFFFFF00000000) >> 32;
+    cpu_state.lo =  mult_result & 0xFFFFFFFF;
 }
 
 void multu()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     uint64_t mult_result = rs_val * rt_val;
-    hi = (mult_result & 0xFFFFFFFF00000000) >> 32;
-    lo = mult_result & 0xFFFFFFFF;
+    cpu_state.hi =  (mult_result & 0xFFFFFFFF00000000) >> 32;
+    cpu_state.lo =  mult_result & 0xFFFFFFFF;
 }
 
 void div()
 {
-    int32_t rs_val = (int32_t)R(rs(current_opcode));
-    int32_t rt_val = (int32_t)R(rs(current_opcode));
+    int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
+    int32_t rt_val = (int32_t)R(rs(cpu_state.current_opcode));
 
     if (rt_val == 0)
         log_error("DIV instruction attempted divide by zero!\n");
@@ -693,14 +668,14 @@ void div()
     uint32_t quotient = rs_val / rt_val;
     uint32_t remainder = rs_val % rt_val;
 
-    hi = remainder;
-    lo = quotient;
+    cpu_state.hi =  remainder;
+    cpu_state.lo =  quotient;
 }
 
 void divu()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rs(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rs(cpu_state.current_opcode));
 
     if (rt_val == 0)
         log_error("DIV instruction attempted divide by zero!\n");
@@ -708,141 +683,141 @@ void divu()
     uint32_t quotient = rs_val / rt_val;
     uint32_t remainder = rs_val % rt_val;
 
-    hi = remainder;
-    lo = quotient;
+    cpu_state.hi =  remainder;
+    cpu_state.lo =  quotient;
 }
 
 void add()
 {
-    uint64_t sum = R(rs(current_opcode)) + R(rt(current_opcode));
+    uint64_t sum = R(rs(cpu_state.current_opcode)) + R(rt(cpu_state.current_opcode));
 
     if (sum > 0xFFFFFFFF)
         log_warning("ADD instruction resulted in overflow!\n");
     else
-        R(rd(current_opcode)) = sum;
+        R(rd(cpu_state.current_opcode)) = sum;
 }
 
 void addu()
 {
-    uint8_t rs_val = R(rs(current_opcode));
+    uint8_t rs_val = R(rs(cpu_state.current_opcode));
 
-    int16_t signed_add = (int16_t)(current_opcode & 0xFFFF);
+    int16_t signed_add = (int16_t)(cpu_state.current_opcode & 0xFFFF);
     uint64_t sum = (uint64_t)(rs_val + signed_add);
 
-    R(rd(current_opcode)) = sum;
+    R(rd(cpu_state.current_opcode)) = sum;
 }
 
 void sub()
 {
-    int32_t rs_val = (int32_t)R(rs(current_opcode));
-    int32_t rt_val = (int32_t)R(rt(current_opcode));
+    int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
+    int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
     int64_t sub_result = rs_val - rt_val;
 
     if (sub_result > 0xFFFFFFFF)
         log_error("SUB instruction caused overflow!\n");
     else
-        R(rd(current_opcode)) = sub_result & 0xFFFFFFFF;
+        R(rd(cpu_state.current_opcode)) = sub_result & 0xFFFFFFFF;
 }
 
 void subu()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     uint64_t sub_result = rs_val - rt_val;
-    R(rd(current_opcode)) = sub_result & 0xFFFFFFFF;
+    R(rd(cpu_state.current_opcode)) = sub_result & 0xFFFFFFFF;
 }
 
 void and()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
-    R(rd(current_opcode)) = rs_val & rt_val;
+    R(rd(cpu_state.current_opcode)) = rs_val & rt_val;
 }
 
 void op_or()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     uint32_t result = rs_val | rt_val;
-    R(rd(current_opcode)) = result;
+    R(rd(cpu_state.current_opcode)) = result;
 }
 
 void op_xor()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     uint32_t result = rs_val ^ rt_val;
-    R(rt(current_opcode)) = result;
+    R(rt(cpu_state.current_opcode)) = result;
 }
 
 void nor()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rt(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     uint32_t nor_result = ~(rs_val | rt_val);
-    R(rd(current_opcode)) = nor_result;
+    R(rd(cpu_state.current_opcode)) = nor_result;
 }
 
 void slt()
 {
-    int32_t rs_val = (int32_t)R(rs(current_opcode));
-    int32_t rt_val = (int32_t)R(rt(current_opcode));
+    int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
+    int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
-    R(rt(current_opcode)) = rs_val < rt_val;
+    R(rt(cpu_state.current_opcode)) = rs_val < rt_val;
 }
 
 void sltu()
 {
-    uint32_t rs_val = R(rs(current_opcode));
-    uint32_t rt_val = R(rs(current_opcode));
+    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rs(cpu_state.current_opcode));
 
-    R(rd(current_opcode)) = rs_val < rt_val;
+    R(rd(cpu_state.current_opcode)) = rs_val < rt_val;
 }
 
-void handle_instruction()
+static void print_debug_info(uint8_t primary_opcode, uint8_t secondary_opcode)
 {
-    R0 = 0;
-    current_opcode = read_word(pc);
-
-    // Get primary opcode from 6 highest bits
-    uint8_t primary_opcode = (current_opcode & 0xFC000000) >> 26;
-    // Get secondary opcode from 6 lowest bits
-    uint8_t secondary_opcode = current_opcode & 0x3F;
-
     char* disassembly = primary_opcodes[primary_opcode].disassembly;
     if (primary_opcode == 0x00)
         disassembly = secondary_opcodes[secondary_opcode].disassembly;
 
     log_info("Executing opcode %s - %x\n\tAddress %x\n\tRS(r%d): %x RT(r%d): %x RD(r%d): %x\n",
-        disassembly, current_opcode, pc,
-        rs(current_opcode), R(rs(current_opcode)),
-        rt(current_opcode), R(rt(current_opcode)),
-        rd(current_opcode), R(rd(current_opcode))
+        disassembly, cpu_state.current_opcode, cpu_state.pc,
+        rs(cpu_state.current_opcode), R(rs(cpu_state.current_opcode)),
+        rt(cpu_state.current_opcode), R(rt(cpu_state.current_opcode)),
+        rd(cpu_state.current_opcode), R(rd(cpu_state.current_opcode))
     );
+}
+
+void handle_instruction()
+{
+    R0 = 0;
+    // Decode next instruction
+    cpu_state.current_opcode = read_word(cpu_state.pc);
+
+    // Get primary opcode from 6 highest bits
+    uint8_t primary_opcode = (cpu_state.current_opcode & 0xFC000000) >> 26;
+    // Get secondary opcode from 6 lowest bits
+    uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
+
+    //print_debug_info(primary_opcode, secondary_opcode);
+
+    // Jump if we have a jump in delay slot, otherwise increment pc normally
+    if (cpu_state.delay_jump)
+    {
+        cpu_state.delay_jump = false;
+        cpu_state.pc = cpu_state.jmp_address;
+    }
+    else
+        cpu_state.pc += 0x4;
 
     if (primary_opcode == 0x00)
         ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
     else
         ((void (*)(void))primary_opcodes[primary_opcode].function)();
-
-    if (pc == 0x80030000)
-        log_info("Reached pc 0x80030000\n");
-
-    char line[256];
-    fgets(line, sizeof(line), stdin);
-
-    // Jump if we have a jump in delay slot, otherwise increment pc normally
-    if (delay_jump)
-    {
-        delay_jump = false;
-        pc = jmp_address;
-    }
-    else
-        pc += 0x4;
 }

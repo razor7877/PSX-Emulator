@@ -8,7 +8,7 @@ void test_addi()
     R0 = 32;
 
     // Add 8 to r0, store in r1
-    current_opcode = 0b00100000000000010000000000001000;
+    cpu_state.current_opcode = 0b00100000000000010000000000001000;
 
     addi();
 
@@ -20,7 +20,7 @@ void test_addi()
     R0 = 32;
 
     // Add -10 to r0, store in r1
-    current_opcode = 0b00100000000000011111111111110110;
+    cpu_state.current_opcode = 0b00100000000000011111111111110110;
 
     addi();
 
@@ -42,16 +42,16 @@ void test_beq()
     R0 = 0;
     R1 = 0;
 
-    current_opcode = 0b00010100000000010000000001000000;
+    cpu_state.current_opcode = 0b00010100000000010000000001000000;
 
-    uint32_t last_pc = pc;
+    uint32_t last_pc = cpu_state.pc;
     beq();
 
     // NOP until we actually jump to the branch
-    current_opcode = 0;
+    cpu_state.current_opcode = 0;
     handle_instruction();
 
-    if (pc != (last_pc + 0x100))
+    if (cpu_state.pc != (last_pc + 0x100))
         log_error("Incorrect BEQ behavior, did not trigger jump on equal registers\n");
 
     reset_cpu_state();
@@ -60,16 +60,16 @@ void test_beq()
     R1 = 1;
 
     // +0x100 offset
-    current_opcode = 0b00010100000000010000000001000000;
+    cpu_state.current_opcode = 0b00010100000000010000000001000000;
 
-    last_pc = pc;
+    last_pc = cpu_state.pc;
     beq();
 
     // NOP until we actually jump to the branch
-    current_opcode = 0;
+    cpu_state.current_opcode = 0;
     handle_instruction();
 
-    if (pc == (last_pc + 0x100))
+    if (cpu_state.pc == (last_pc + 0x100))
         log_error("Incorrect BEQ behavior, triggered jump on different registers\n");
 
     reset_cpu_state();
@@ -82,16 +82,16 @@ void test_bne()
     R0 = 0;
     R1 = 0;
 
-    current_opcode = 0b00010100000000010000000001000000;
+    cpu_state.current_opcode = 0b00010100000000010000000001000000;
 
-    uint32_t last_pc = pc;
+    uint32_t last_pc = cpu_state.pc;
     bne();
 
     // NOP until we actually jump to the branch
-    current_opcode = 0;
+    cpu_state.current_opcode = 0;
     handle_instruction();
 
-    if (pc == (last_pc + 0x100))
+    if (cpu_state.pc == (last_pc + 0x100))
         log_error("Incorrect BNE behavior, triggered jump on equal registers\n");
 
     reset_cpu_state();
@@ -100,16 +100,16 @@ void test_bne()
     R1 = 1;
 
     // +0x100 offset
-    current_opcode = 0b00010100000000010000000001000000;
+    cpu_state.current_opcode = 0b00010100000000010000000001000000;
 
-    last_pc = pc;
+    last_pc = cpu_state.pc;
     bne();
     
     // NOP until we actually jump to the branch
-    current_opcode = 0;
+    cpu_state.current_opcode = 0;
     handle_instruction();
 
-    if (pc != (last_pc + 0x100))
+    if (cpu_state.pc != (last_pc + 0x100))
         log_error("Incorrect BNE behavior, did not trigger jump on different registers\n");
 
     reset_cpu_state();
@@ -122,7 +122,7 @@ void test_lui()
     R0 = 0;
 
     // LUI 0xABCD into register 0
-    current_opcode = 0b00111100000000001010101111001101;
+    cpu_state.current_opcode = 0b00111100000000001010101111001101;
 
     lui();
 
@@ -139,7 +139,7 @@ void test_ori()
     R0 = 0xFFFF0000;
 
     // ORI r0 with 0xFFFF, store in R1
-    current_opcode = 0b00110100000000011111111111111111;
+    cpu_state.current_opcode = 0b00110100000000011111111111111111;
 
     ori();
 
@@ -159,7 +159,7 @@ void test_sw()
     uint16_t offset = -16;
 
     // SW r1 at address r0 offset by -16
-    current_opcode = 0b10101100000000010000000000000000 | offset;
+    cpu_state.current_opcode = 0b10101100000000010000000000000000 | offset;
 
     sw();
 
@@ -178,7 +178,7 @@ void test_addiu()
     R0 = 13;
     uint16_t immediate = 37;
 
-    current_opcode = 0b00100100000000010000000000000000 | immediate;
+    cpu_state.current_opcode = 0b00100100000000010000000000000000 | immediate;
 
     addiu();
 
@@ -201,7 +201,7 @@ void test_or()
     R1 = 0x0000FFFF;
 
     // OR R0 with R1, store in R2
-    current_opcode = 0b00000000000000010001000000100101;
+    cpu_state.current_opcode = 0b00000000000000010001000000100101;
 
     op_or();
 
