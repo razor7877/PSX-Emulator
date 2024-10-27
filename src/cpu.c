@@ -109,7 +109,7 @@ const instruction secondary_opcodes[0x40] = {
     { "N/A", undefined },         // 17h
     { "MULT", mult },             // 18h
     { "MULTU", multu },           // 19h
-    { "DIV", div },               // 1Ah
+    { "DIV", op_div },               // 1Ah
     { "DIVU", divu },             // 1Bh
     { "N/A", undefined },         // 1Ch
     { "N/A", undefined },         // 1Dh
@@ -171,7 +171,7 @@ void b_cond_z()
 {
     int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
 
-    R31 = cpu_state.pc + 0x8;
+    R31 = cpu_state.pc + 0x4;
 
     if (rs_val > 0)
     {
@@ -195,7 +195,7 @@ void j()
 void jal()
 {
     // Save return address in R31
-    R31 = cpu_state.pc + 0x8;
+    R31 = cpu_state.pc + 0x4;
 
     // Get 28 lower address bits from 26 lowest bits of the opcode
     uint32_t instr_index = (cpu_state.current_opcode & 0x03FFFFFF) << 2;
@@ -473,7 +473,20 @@ void sb()
 
 void sh()
 {
-    log_warning("Unhandled instruction sh\n");
+    // Base register
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
+
+    // Get signed offset from 16 lower bits
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
+
+    int address = base_addr + offset;
+
+    uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFFFF;
+
+    if ((address & 0b1) != 0)
+        log_error("Unaligned address exception with sh instruction!\n");
+    else
+        write_word(address, value);
 }
 
 void swl()
@@ -601,7 +614,7 @@ void jr()
 void jalr()
 {
     // Save return address in R31
-    R(rd(cpu_state.current_opcode)) = cpu_state.pc + 0x8;
+    R(rd(cpu_state.current_opcode)) = cpu_state.pc + 0x4;
 
     cpu_state.jmp_address = R(rs(cpu_state.current_opcode));
     cpu_state.delay_jump = true;
@@ -657,7 +670,7 @@ void multu()
     cpu_state.lo =  mult_result & 0xFFFFFFFF;
 }
 
-void div()
+void op_div()
 {
     int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
     int32_t rt_val = (int32_t)R(rs(cpu_state.current_opcode));
@@ -792,6 +805,8 @@ static void print_debug_info(uint8_t primary_opcode, uint8_t secondary_opcode)
         rt(cpu_state.current_opcode), R(rt(cpu_state.current_opcode)),
         rd(cpu_state.current_opcode), R(rd(cpu_state.current_opcode))
     );
+
+    log_warning("Return address r31 %x\n", R31);
 }
 
 void handle_instruction()
@@ -805,13 +820,15 @@ void handle_instruction()
     // Get secondary opcode from 6 lowest bits
     uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
 
-    //print_debug_info(primary_opcode, secondary_opcode);
+    if (cpu_state.pc > 0xBFC07000)
+        print_debug_info(primary_opcode, secondary_opcode);
 
     // Jump if we have a jump in delay slot, otherwise increment pc normally
     if (cpu_state.delay_jump)
     {
         cpu_state.delay_jump = false;
         cpu_state.pc = cpu_state.jmp_address;
+        log_debug("JUMPED at %x\n", cpu_state.jmp_address);
     }
     else
         cpu_state.pc += 0x4;

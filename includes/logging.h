@@ -2,6 +2,7 @@
 #define LOGGING_H
 
 void log_info(const char* log, ...);
+void log_info_no_prefix(const char* log, ...);
 void log_debug(const char* log, ...);
 void log_warning(const char* log, ...);
 void log_error(const char* log, ...);

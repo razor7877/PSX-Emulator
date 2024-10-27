@@ -144,7 +144,7 @@ void mflo();
 void mtlo();
 void mult();
 void multu();
-void div();
+void op_div();
 void divu();
 void add();
 void addu();

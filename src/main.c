@@ -1,9 +1,11 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "memory.h"
 #include "logging.h"
 #include "cpu.h"
 #include "tests.h"
+#include "debug.h"
 
 const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
 
@@ -39,15 +41,19 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
+	add_code_breakpoint(0xBFC06F04);
+	add_code_breakpoint(0x80030000);
+	add_code_breakpoint(0xBFC07124);
+
 	for (;;)
 	{
-		handle_instruction();
-
-		if (cpu_state.pc == 0x80030000)
-			log_info("Reached pc 0x80030000\n");
-
-		//char line[256];
-		//fgets(line, sizeof(line), stdin);
+		if (!debug_state.in_debug)
+		{
+			handle_instruction();
+			check_break_address(cpu_state.pc);
+		}
+		else
+			handle_debug_input();
 	}
 
 	return 0;
