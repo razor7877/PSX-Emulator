@@ -44,15 +44,24 @@ int main(int argc, char** argv)
 	// BIOS finished execution
 	add_breakpoint(0x80030000, true, false);
 
-	add_breakpoint(0xB0, true, false);
+	//add_breakpoint(0xBFC00004, true, false);
 
-	add_breakpoint(0x00, false, true);
+	//add_breakpoint(0xB0, true, false);
+	add_breakpoint(0xB0, false, true);
+	add_breakpoint(0xBFC0686C, true, false);
 
 	for (;;)
 	{
 		if (!debug_state.in_debug)
 		{
 			handle_instruction(false);
+
+			if ((cpu_state.pc == 0xA0 && R9 == 0x3C) || (cpu_state.pc == 0xB0 && R9 == 0x3D))
+			{
+				char c = (char)(uint8_t)R4;
+				printf("%c\n", c);
+			}
+
 			check_code_breakpoints(cpu_state.pc);
 		}
 		else

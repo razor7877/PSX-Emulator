@@ -28,6 +28,8 @@ void clear_memory();
 /// <returns>The word at the address</returns>
 uint32_t read_word(uint32_t address);
 
+uint32_t read_word_internal(uint32_t address);
+
 /// <summary>
 /// Writes a word at the address with the value given in the KUSEG
 /// </summary>

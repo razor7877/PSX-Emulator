@@ -4,6 +4,7 @@
 #include "memory.h"
 #include "logging.h"
 #include "debug.h"
+#include "coprocessor.h"
 
 /// <summary>
 /// 2048 KiB
@@ -166,6 +167,18 @@ static uint32_t read_word_kseg2(uint32_t address)
 /// <returns>The word at the address</returns>
 uint32_t read_word(uint32_t address)
 {
+	// If bit 16 of reg 12 in CPR0 is set, writes are directed to the data cache
+	if (CPR0(12) & 0x10000)
+	{
+		log_warning("Unhandled isolated cache mem read at %x\n", address);
+		return 0xFFFFFFFF;
+	}
+
+	return read_word_internal(address);
+}
+
+uint32_t read_word_internal(uint32_t address)
+{
 	check_data_breakpoints(address);
 
 	if (address <= 0x1FC00000) // KUSEG read
@@ -284,6 +297,13 @@ static void write_word_kseg2(uint32_t address, uint32_t value)
 void write_word(uint32_t address, uint32_t value)
 {
 	check_data_breakpoints(address);
+
+	// If bit 16 of reg 12 in CPR0 is set, writes are directed to the data cache
+	if (CPR0(12) & 0x10000)
+	{
+		log_warning("Unhandled isolated cache mem write at %x value %x\n", address, value);
+		return;
+	}
 
 	if (address <= 0x1FC00000) // KUSEG write
 		return write_word_kuseg(address, value);

@@ -50,7 +50,7 @@ typedef struct
 
 typedef struct
 {
-	// r0-31
+	// Output regs to simulate load delay slot
 	uint32_t registers[32];
 
 	/// <summary>
@@ -82,6 +82,12 @@ typedef struct
 	/// The address to jump to
 	/// </summary>
 	uint32_t jmp_address;
+
+	int delay_fetch;
+
+	int fetch_reg_index;
+
+	uint32_t fetch_reg_value;
 } cpu;
 
 extern cpu cpu_state;
@@ -157,4 +163,4 @@ void nor();
 void slt();
 void sltu();
 
-void handle_instruction();
+void handle_instruction(bool debug_info);

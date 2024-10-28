@@ -5,9 +5,6 @@
 #include "logging.h"
 #include "debug.h"
 
-#define cop0_code(value) ((((value & 0x03E00000) >> 21)))
-#define CPR0(value) _cop0_registers[value]
-
 uint32_t _cop0_registers[64] = { 0 };
 
 void mfc()

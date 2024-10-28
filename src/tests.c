@@ -49,7 +49,7 @@ void test_beq()
 
     // NOP until we actually jump to the branch
     cpu_state.current_opcode = 0;
-    handle_instruction();
+    handle_instruction(false);
 
     if (cpu_state.pc != (last_pc + 0x100))
         log_error("Incorrect BEQ behavior, did not trigger jump on equal registers\n");
@@ -67,7 +67,7 @@ void test_beq()
 
     // NOP until we actually jump to the branch
     cpu_state.current_opcode = 0;
-    handle_instruction();
+    handle_instruction(false);
 
     if (cpu_state.pc == (last_pc + 0x100))
         log_error("Incorrect BEQ behavior, triggered jump on different registers\n");
@@ -89,7 +89,7 @@ void test_bne()
 
     // NOP until we actually jump to the branch
     cpu_state.current_opcode = 0;
-    handle_instruction();
+    handle_instruction(false);
 
     if (cpu_state.pc == (last_pc + 0x100))
         log_error("Incorrect BNE behavior, triggered jump on equal registers\n");
@@ -107,7 +107,7 @@ void test_bne()
     
     // NOP until we actually jump to the branch
     cpu_state.current_opcode = 0;
-    handle_instruction();
+    handle_instruction(false);
 
     if (cpu_state.pc != (last_pc + 0x100))
         log_error("Incorrect BNE behavior, did not trigger jump on different registers\n");
@@ -119,14 +119,18 @@ void test_bne()
 
 void test_lui()
 {
-    R0 = 0;
+    R1 = 0;
 
     // LUI 0xABCD into register 0
-    cpu_state.current_opcode = 0b00111100000000001010101111001101;
+    cpu_state.current_opcode = 0b00111100000000011010101111001101;
 
     lui();
 
-    if (R0 != 0xABCD0000)
+    // NOP before checking value because of delay slot
+    cpu_state.current_opcode = 0;
+    handle_instruction(false);
+
+    if (R1 != 0xABCD0000)
         log_error("Incorrect value in r0 after LUI of 0xABCD! Got %x instead\n", R0);
 
     log_info("Finished testing LUI\n");

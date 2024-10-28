@@ -163,6 +163,13 @@ void reset_cpu_state()
     cpu_state.jmp_address = 0;
 }
 
+static void delay_reg_fetch(int reg_index, uint32_t value)
+{
+    cpu_state.delay_fetch = 2;
+    cpu_state.fetch_reg_index = reg_index;
+    cpu_state.fetch_reg_value = value;
+}
+
 void undefined()
 {
     debug_state.in_debug = true;
@@ -339,7 +346,7 @@ void lui()
     uint16_t immediate = cpu_state.current_opcode & 0xFFFF;
     uint32_t upper_value = immediate << 16;
 
-    R(rt(cpu_state.current_opcode)) = upper_value;
+    delay_reg_fetch(rt(cpu_state.current_opcode), upper_value);
 }
 
 void lb()
@@ -362,7 +369,8 @@ void lb()
     int8_t byte = (word & mask) >> (24 - byte_index * 8);
 
     int32_t sign_extended = (int32_t)byte;
-    R(rt(cpu_state.current_opcode)) = sign_extended;
+
+    delay_reg_fetch(rt(cpu_state.current_opcode), sign_extended);
 }
 
 void lh()
@@ -385,7 +393,7 @@ void lh()
     int16_t half_word = (word & mask) >> (16 - byte_index * 16);
 
     int32_t sign_extended = (int32_t)half_word;
-    R(rt(cpu_state.current_opcode)) = sign_extended;
+    delay_reg_fetch(rt(cpu_state.current_opcode), sign_extended);
 }
 
 void lwl()
@@ -407,7 +415,7 @@ void lw()
     // Get the word
     uint32_t word = (uint32_t)read_word(address);
 
-    R(rt(cpu_state.current_opcode)) = word;
+    delay_reg_fetch(rt(cpu_state.current_opcode), word);
 }
 
 void lbu()
@@ -429,7 +437,7 @@ void lbu()
     // Shift the value to bring it to an 8 bit value
     uint8_t byte = (word & mask) >> (24 - byte_index * 8);
 
-    R(rt(cpu_state.current_opcode)) = byte;
+    delay_reg_fetch(rt(cpu_state.current_opcode), byte);
 }
 
 void lhu()
@@ -451,7 +459,7 @@ void lhu()
     // Shift the value to bring it to an 8 bit value
     uint16_t half_word = (word & mask) >> (16 - byte_index * 16);
 
-    R(rt(cpu_state.current_opcode)) = half_word;
+    delay_reg_fetch(rt(cpu_state.current_opcode), half_word);
 }
 
 void lwr()
@@ -511,8 +519,6 @@ void sw()
         log_error("Unaligned address exception with sw instruction!\n");
     else
         write_word(address, rt_val);
-
-    log_debug("Store word %x at address %x\n", rt_val, address);
 }
 
 void swr()
@@ -825,7 +831,7 @@ void handle_instruction(bool debug_info)
 {
     R0 = 0;
     // Decode next instruction
-    cpu_state.current_opcode = read_word(cpu_state.pc);
+    cpu_state.current_opcode = read_word_internal(cpu_state.pc);
 
     // Get primary opcode from 6 highest bits
     uint8_t primary_opcode = (cpu_state.current_opcode & 0xFC000000) >> 26;
@@ -840,7 +846,6 @@ void handle_instruction(bool debug_info)
     {
         cpu_state.delay_jump = false;
         cpu_state.pc = cpu_state.jmp_address;
-        log_debug("JUMPED at %x\n", cpu_state.jmp_address);
     }
     else
         cpu_state.pc += 0x4;
@@ -849,4 +854,11 @@ void handle_instruction(bool debug_info)
         ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
     else
         ((void (*)(void))primary_opcodes[primary_opcode].function)();
+
+    // Ugly, used so that a memory load into register gets done at the end of the next instruction
+    if (cpu_state.delay_fetch != 0 && --cpu_state.delay_fetch >= 1)
+    {
+        R(cpu_state.fetch_reg_index) = cpu_state.fetch_reg_value;
+        cpu_state.delay_fetch = false;
+    }
 }

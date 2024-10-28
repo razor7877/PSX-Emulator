@@ -9,7 +9,7 @@
 debug_struct debug_state = {
 	.code_breakpoints = {0},
 	.breakpoint_count = 0,
-	.in_debug = false
+	.in_debug = false,
 };
 
 char input[256];
@@ -94,12 +94,17 @@ void handle_debug_input()
 			handle_instruction(true);
 			break;
 
+		case 'o': // Step out
+			while (cpu_state.pc != R31)
+				handle_instruction(false);
+			break;
+
 		case 'r': // Show registers / CPU state
 			show_cpu_state();
 			break;
 
 		default:
-			log_info_no_prefix("Use the following commands to interact with the debugger:\n\ts - set breakpoint\n\tu - unset breakpoint\n\tl - list breakpoints\n\tc - continue execution\n\tn - step next instruction\n\tr - show registers\n");
+			log_info_no_prefix("Use the following commands to interact with the debugger:\n\ts - set breakpoint\n\tu - unset breakpoint\n\tl - list breakpoints\n\tc - continue execution\n\tn - step next instruction\n\to - step out\n\tr - show registers\n");
 			break;
 	}
 }
