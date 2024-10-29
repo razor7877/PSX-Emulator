@@ -235,7 +235,7 @@ void test_memory()
 {
     uint8_t value = 0;
 
-    for (int i = 0; i < 2048 * KIB_SIZE; i++)
+    for (int i = 0; i < 2048 * KIB_SIZE; i += 4)
     {
         write_word(i, value);
 
@@ -247,7 +247,7 @@ void test_memory()
 
     clear_memory();
 
-    for (int i = 0; i < 2048 * KIB_SIZE; i++)
+    for (int i = 0; i < 2048 * KIB_SIZE; i += 4)
     {
         write_word(0x80000000 + i, value);
 
@@ -259,7 +259,7 @@ void test_memory()
 
     clear_memory();
 
-    for (int i = 0; i < 2048 * KIB_SIZE; i++)
+    for (int i = 0; i < 2048 * KIB_SIZE; i += 4)
     {
         write_word(0xA0000000 + i, value);
 

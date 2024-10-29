@@ -347,6 +347,7 @@ void lui()
     delay_reg_fetch(rt(cpu_state.current_opcode), upper_value);
 }
 
+// TODO : Clean up lb/lbu/lh/lhu/sb/sh instructions!
 void lb()
 {
     // Base register
@@ -358,8 +359,8 @@ void lb()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint32_t word = (uint32_t)read_word(address);
-    uint8_t byte_index = address;
+    uint8_t byte_index = 3 - address % 4;
+    uint32_t word = (uint32_t)read_word(address & ~0b11);
 
     // First byte in first 8 bits, second in the next 8 and so on
     uint32_t mask = 0xFF000000 >> (byte_index * 8);
@@ -382,8 +383,8 @@ void lh()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint32_t word = (uint32_t)read_word(address);
-    uint16_t byte_index = address % 2;
+    uint16_t byte_index = 1 - address % 2;
+    uint32_t word = (uint32_t)read_word(address & ~0b11);
 
     // First byte in first 8 bits, second in the next 8 and so on
     uint32_t mask = 0xFFFF0000 >> (byte_index * 16);
@@ -427,8 +428,8 @@ void lbu()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint32_t word = (uint32_t)read_word(address);
-    uint8_t byte_index = address % 4;
+    uint8_t byte_index = 3 - address % 4;
+    uint32_t word = (uint32_t)read_word(address & ~0b11);
 
     // First byte in first 8 bits, second in the next 8 and so on
     uint32_t mask = 0xFF000000 >> (byte_index * 8);
@@ -449,8 +450,8 @@ void lhu()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint32_t word = (uint32_t)read_word(address);
-    uint16_t byte_index = address % 2;
+    uint16_t byte_index = 1 - address % 2;
+    uint32_t word = (uint32_t)read_word(address & ~0b11);
 
     // First byte in first 8 bits, second in the next 8 and so on
     uint32_t mask = 0xFFFF0000 >> (byte_index * 16);
@@ -479,9 +480,9 @@ void sb()
     uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFF;
 
     // Where the byte is located in the word
-    int byte_index = address % 4;
+    int byte_index = 3 - address % 4;
     // The address of the aligned word where the byte will be stored
-    int word_index = address - (address % 4);
+    int word_index = address & ~0b11;
 
     // A mask to keep all the original bits except the ones we're replacing
     uint32_t original_value_mask = 0xFFFFFFFF & ~(0xFF000000 >> (byte_index * 8));
@@ -493,7 +494,7 @@ void sb()
     uint32_t new_value = (word_value & original_value_mask) | indexed_value;
 
     //log_debug("Byte value is %x with index %x --- Value before sb %x --- After sb %x\n", value, byte_index, word_value, new_value);
-    write_word(address, new_value);
+    write_word(word_index, new_value);
 }
 
 void sh()
@@ -509,9 +510,9 @@ void sh()
     uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFFFF;
 
     // Where the half word is located in the word
-    int half_word_index = address % 2;
+    int half_word_index = 1 - address % 2;
     // The address of the aligned word where the half word will be stored
-    int word_index = address - (address % 2);
+    int word_index = address & ~0b11;
 
     // A mask to keep all the original bits except the ones we're replacing
     uint32_t original_value_mask = 0xFFFFFFFF & ~(0xFFFF0000 >> (half_word_index * 16));
@@ -527,7 +528,7 @@ void sh()
     if ((address & 0b1) != 0)
         log_error("Unaligned address exception with sh instruction!\n");
     else
-        write_word(address, new_value);
+        write_word(word_index, new_value);
 }
 
 void swl()

@@ -168,6 +168,11 @@ static uint32_t read_word_kseg2(uint32_t address)
 /// <returns>The word at the address</returns>
 uint32_t read_word(uint32_t address)
 {
+	if ((address & 0b11) != 0)
+	{
+		log_error("Unaligned memory read exception!\n");
+	}
+
 	// If bit 16 of reg 12 in CPR0 is set, writes are directed to the data cache
 	if (CPR0(12) & 0x10000)
 	{
@@ -297,6 +302,12 @@ static void write_word_kseg2(uint32_t address, uint32_t value)
 /// <param name="value">The value to be written</param>
 void write_word(uint32_t address, uint32_t value)
 {
+	if ((address & 0b11) != 0)
+	{
+		log_error("Unaligned memory write exception!\n");
+		return;
+	}
+
 	check_data_breakpoints(address);
 
 	// If bit 16 of reg 12 in CPR0 is set, writes are directed to the data cache

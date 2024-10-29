@@ -51,9 +51,12 @@ int main(int argc, char** argv)
 
 	// printf version of bios
 	//add_breakpoint(0xBFC018E0, true, false);
-	add_breakpoint(0xBFC00E64, true, false);
-	add_breakpoint(0xBFC00E1C, true, false);
-	add_breakpoint(0x2940, true, false);
+	//add_breakpoint(0xBFC00E64, true, false);
+	//add_breakpoint(0xBFC00E1C, true, false);
+	//add_breakpoint(0x2940, true, false);
+
+	//add_breakpoint(0x3CAC, true, false);
+	//add_breakpoint(0xBFC02B7C, true, false);
 
 	for (;;)
 	{
