@@ -5,6 +5,7 @@
 #include "logging.h"
 #include "debug.h"
 #include "coprocessor.h"
+#include "cpu.h"
 
 /// <summary>
 /// 2048 KiB
@@ -190,7 +191,7 @@ uint32_t read_word_internal(uint32_t address)
 	else if (address >= 0xFFFE0000 && address <= 0xFFFE0000 + 0x200) // KSEG 2 read
 		return read_word_kseg2(address);
 
-	log_error("Attempted reading word outside of any memory segment! Address %x\n", address);
+	log_error("Attempted reading word outside of any memory segment! Address %x --- pc is %x\n", address, cpu_state.pc);
 
 	return 0xFFFFFFFF;
 }
@@ -314,7 +315,7 @@ void write_word(uint32_t address, uint32_t value)
 	else if (address >= 0xFFFE0000 && address <= 0xFFFE0000 + 0x200) // KSEG 2 write
 		return write_word_kseg2(address, value);
 
-	log_error("Attempted writing word outside of any memory segment! Address %x Value %x\n", address, value);
+	log_error("Attempted writing word outside of any memory segment! Address %x Value %x --- pc is %x\n", address, value, cpu_state.pc);
 }
 
 void load_bios_into_mem(FILE* bios_file)

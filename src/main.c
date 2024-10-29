@@ -44,24 +44,22 @@ int main(int argc, char** argv)
 	// BIOS finished execution
 	add_breakpoint(0x80030000, true, false);
 
-	//add_breakpoint(0xBFC00004, true, false);
+	// KernelRedirect
+	//add_breakpoint(0x2834, true, false);
+	// RemoveDevice
+	//add_breakpoint(0x2910, true, false);
 
-	//add_breakpoint(0xB0, true, false);
-	add_breakpoint(0xB0, false, true);
-	add_breakpoint(0xBFC0686C, true, false);
+	// printf version of bios
+	//add_breakpoint(0xBFC018E0, true, false);
+	add_breakpoint(0xBFC00E64, true, false);
+	add_breakpoint(0xBFC00E1C, true, false);
+	add_breakpoint(0x2940, true, false);
 
 	for (;;)
 	{
 		if (!debug_state.in_debug)
 		{
-			handle_instruction(false);
-
-			if ((cpu_state.pc == 0xA0 && R9 == 0x3C) || (cpu_state.pc == 0xB0 && R9 == 0x3D))
-			{
-				char c = (char)(uint8_t)R4;
-				printf("%c\n", c);
-			}
-
+			handle_instruction(debug_state.print_instructions);
 			check_code_breakpoints(cpu_state.pc);
 		}
 		else

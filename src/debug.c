@@ -10,6 +10,7 @@ debug_struct debug_state = {
 	.code_breakpoints = {0},
 	.breakpoint_count = 0,
 	.in_debug = false,
+	.print_instructions = false,
 };
 
 char input[256];
@@ -76,6 +77,10 @@ void handle_debug_input()
 	{
 		case 's': // Add breakpoint
 			set_breakpoint_user();
+			break;
+
+		case 'd':
+			debug_state.print_instructions = !debug_state.print_instructions;
 			break;
 
 		case 'u': // Delete breakpoint

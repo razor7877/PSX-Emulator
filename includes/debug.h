@@ -18,6 +18,7 @@ typedef struct
 	breakpoint code_breakpoints[MAX_BREAKPOINTS];
 	int breakpoint_count;
 	bool in_debug;
+	bool print_instructions;
 } debug_struct;
 
 extern debug_struct debug_state;

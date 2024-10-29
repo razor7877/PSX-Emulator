@@ -180,8 +180,6 @@ void b_cond_z()
 {
     int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
 
-    R31 = cpu_state.pc + 0x4;
-
     if (rs_val > 0)
     {
         uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
@@ -219,7 +217,7 @@ void beq()
     uint32_t rs_val = R(rs(cpu_state.current_opcode));
     uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
-    uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
+    int16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val == rt_val)
@@ -248,7 +246,7 @@ void blez()
 {
     int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
 
-    uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
+    int16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val <= 0)
@@ -262,7 +260,7 @@ void bgtz()
 {
     int32_t rs_val = R(rs(cpu_state.current_opcode));
 
-    uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
+    int16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     if (rs_val > 0)
@@ -361,7 +359,7 @@ void lb()
 
     // Get the word that contains the byte
     uint32_t word = (uint32_t)read_word(address);
-    uint8_t byte_index = address % 4;
+    uint8_t byte_index = address;
 
     // First byte in first 8 bits, second in the next 8 and so on
     uint32_t mask = 0xFF000000 >> (byte_index * 8);
@@ -435,7 +433,7 @@ void lbu()
     // First byte in first 8 bits, second in the next 8 and so on
     uint32_t mask = 0xFF000000 >> (byte_index * 8);
     // Shift the value to bring it to an 8 bit value
-    uint8_t byte = (word & mask) >> (24 - byte_index * 8);
+    uint32_t byte = (word & mask) >> (24 - byte_index * 8);
 
     delay_reg_fetch(rt(cpu_state.current_opcode), byte);
 }
@@ -480,7 +478,22 @@ void sb()
 
     uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFF;
 
-    write_word(address, value);
+    // Where the byte is located in the word
+    int byte_index = address % 4;
+    // The address of the aligned word where the byte will be stored
+    int word_index = address - (address % 4);
+
+    // A mask to keep all the original bits except the ones we're replacing
+    uint32_t original_value_mask = 0xFFFFFFFF & ~(0xFF000000 >> (byte_index * 8));
+    // The bits of the new value shifted to the right position
+    uint32_t indexed_value = value << (24 - byte_index * 8);
+
+    // Original value in memory
+    uint32_t word_value = read_word(word_index);
+    uint32_t new_value = (word_value & original_value_mask) | indexed_value;
+
+    //log_debug("Byte value is %x with index %x --- Value before sb %x --- After sb %x\n", value, byte_index, word_value, new_value);
+    write_word(address, new_value);
 }
 
 void sh()
@@ -495,10 +508,26 @@ void sh()
 
     uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFFFF;
 
+    // Where the half word is located in the word
+    int half_word_index = address % 2;
+    // The address of the aligned word where the half word will be stored
+    int word_index = address - (address % 2);
+
+    // A mask to keep all the original bits except the ones we're replacing
+    uint32_t original_value_mask = 0xFFFFFFFF & ~(0xFFFF0000 >> (half_word_index * 16));
+    // The bits of the new value shifted to the right position
+    uint32_t indexed_value = value << (16 - half_word_index * 16);
+
+    // Original value in memory
+    uint32_t word_value = read_word(word_index);
+    uint32_t new_value = (word_value & original_value_mask) | indexed_value;
+
+    log_debug("Half word value is %x with index %x --- Value before sb %x --- After sb %x\n", value, half_word_index, word_value, new_value);
+
     if ((address & 0b1) != 0)
         log_error("Unaligned address exception with sh instruction!\n");
     else
-        write_word(address, value);
+        write_word(address, new_value);
 }
 
 void swl()
@@ -695,7 +724,7 @@ void multu()
 void op_div()
 {
     int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
-    int32_t rt_val = (int32_t)R(rs(cpu_state.current_opcode));
+    int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
     if (rt_val == 0)
         log_error("DIV instruction attempted divide by zero!\n");
@@ -710,7 +739,7 @@ void op_div()
 void divu()
 {
     uint32_t rs_val = R(rs(cpu_state.current_opcode));
-    uint32_t rt_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     if (rt_val == 0)
         log_error("DIV instruction attempted divide by zero!\n");
@@ -808,7 +837,7 @@ void slt()
 void sltu()
 {
     uint32_t rs_val = R(rs(cpu_state.current_opcode));
-    uint32_t rt_val = R(rs(cpu_state.current_opcode));
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     R(rd(cpu_state.current_opcode)) = rs_val < rt_val;
 }
@@ -827,6 +856,23 @@ static void print_debug_info(uint8_t primary_opcode, uint8_t secondary_opcode)
     );
 }
 
+char tty[256] = { 0 };
+int char_index = 0;
+
+static void check_tty_output()
+{
+    if ((cpu_state.pc == 0xA0 && R9 == 0x3C) || (cpu_state.pc == 0xB0 && R9 == 0x3D))
+    {
+        printf("R4 value is %x\n", R4);
+        tty[char_index] = (char)(uint8_t)R4;
+        tty[char_index + 1] = "\0";
+        char_index = (char_index + 1) % 256;
+        printf("%s\n", tty);
+    }
+    //else
+    //    printf("pc = %x\n", cpu_state.pc);
+}
+
 void handle_instruction(bool debug_info)
 {
     R0 = 0;
@@ -840,6 +886,8 @@ void handle_instruction(bool debug_info)
 
     if (debug_info)
         print_debug_info(primary_opcode, secondary_opcode);
+
+    check_tty_output();
 
     // Jump if we have a jump in delay slot, otherwise increment pc normally
     if (cpu_state.delay_jump)
