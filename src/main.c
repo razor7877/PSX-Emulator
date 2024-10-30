@@ -57,6 +57,9 @@ int main(int argc, char** argv)
 
 	//add_breakpoint(0x3CAC, true, false);
 	//add_breakpoint(0xBFC02B7C, true, false);
+	//add_breakpoint(0xBFC00E50, false, true);
+	//add_breakpoint(0x1230, true, false);
+	add_breakpoint(0xBFC04690, true, false);
 
 	for (;;)
 	{

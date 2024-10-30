@@ -178,15 +178,59 @@ void undefined()
 
 void b_cond_z()
 {
+    // The value to check against
     int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
 
-    if (rs_val > 0)
-    {
-        uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
-        int32_t offset_18 = (int32_t)(offset_16 << 2);
+    // The condition to check for
+    uint32_t condition = rt(cpu_state.current_opcode);
 
-        cpu_state.pc = cpu_state.pc + offset_18;
+    // The jump/branch offset
+    uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
+    int32_t offset_18 = (int32_t)(offset_16 << 2);
+
+    bool passes_check = false;
+    // If it passes the check, whether this is a jump or branch condition
+    bool is_link_condition = false;
+
+    // This instruction encodes different checks depending on the 5 bits in rt
+    switch (condition)
+    {
+        case 0b00000: // BLTZ (< 0)
+            if (rs_val < 0)
+                passes_check = true;
+            break;
+
+        case 0b10000: // BLTZAL (< 0 & link)
+            if (rs_val < 0)
+            {
+                passes_check = true;
+                is_link_condition = true;
+            }
+            break;
+
+        case 0b00001: // BGEZ (>= 0)
+            if (rs_val > 0)
+                passes_check = true;
+            break;
+
+        case 0b10001: // BGEZAL (>= 0 & link)
+            if (rs_val > 0)
+            {
+                passes_check = true;
+                is_link_condition = true;
+            }
+            break;
+
+        default:
+            log_error("Got unhandled condition in BcondZ opcode!\n");
+            break;
     }
+
+    if (is_link_condition)
+        R31 = cpu_state.pc + 0x4;
+
+    if (passes_check)
+        cpu_state.pc = cpu_state.pc + offset_18;
 }
 
 void j()

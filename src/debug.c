@@ -13,7 +13,7 @@ debug_struct debug_state = {
 	.print_instructions = false,
 };
 
-char input[256];
+char input[256] = {0};
 
 static void set_breakpoint_user()
 {
