@@ -209,12 +209,12 @@ void b_cond_z()
             break;
 
         case 0b00001: // BGEZ (>= 0)
-            if (rs_val > 0)
+            if (rs_val >= 0)
                 passes_check = true;
             break;
 
         case 0b10001: // BGEZAL (>= 0 & link)
-            if (rs_val > 0)
+            if (rs_val >= 0)
             {
                 passes_check = true;
                 is_link_condition = true;
@@ -230,7 +230,10 @@ void b_cond_z()
         R31 = cpu_state.pc + 0x4;
 
     if (passes_check)
-        cpu_state.pc = cpu_state.pc + offset_18;
+    {
+        cpu_state.jmp_address = cpu_state.pc + offset_18;
+        cpu_state.delay_jump = true;
+    }
 }
 
 void j()

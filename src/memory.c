@@ -170,7 +170,8 @@ uint32_t read_word(uint32_t address)
 {
 	if ((address & 0b11) != 0)
 	{
-		log_error("Unaligned memory read exception!\n");
+		log_error("Unaligned memory read exception! PC is %x\n", cpu_state.pc);
+		debug_state.in_debug = true;
 	}
 
 	// If bit 16 of reg 12 in CPR0 is set, writes are directed to the data cache
@@ -304,7 +305,8 @@ void write_word(uint32_t address, uint32_t value)
 {
 	if ((address & 0b11) != 0)
 	{
-		log_error("Unaligned memory write exception!\n");
+		log_error("Unaligned memory write exception! PC is %x\n", cpu_state.pc);
+		debug_state.in_debug = true;
 		return;
 	}
 
