@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "main.h"
+
 #define WORD_SIZE 4
 #define KIB_SIZE 1024
 #define KIB_TO_WORD_SIZE (KIB_SIZE / WORD_SIZE)
@@ -42,3 +44,11 @@ void write_word(uint32_t address, uint32_t value);
 /// </summary>
 /// <param name="bios_file">The file stream to be loaded, it should contain 512 KiB of binary data</param>
 void load_bios_into_mem(FILE* bios_file);
+
+/// <summary>
+/// Sideloads an EXE file into the RAM. May be called after BIOS finishes execution (when PC = 0x80030000)
+/// to run a program without loading a full ISO disk image
+///</summary>
+/// <param name="exe_file">The file stream to be loaded</param>
+/// <param name="exe_size">The size of the EXE to be loaded</param>
+void sideload_exe_into_mem(exe_header file_header, FILE* exe_file);

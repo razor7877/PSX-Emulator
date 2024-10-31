@@ -177,7 +177,7 @@ uint32_t read_word(uint32_t address)
 	// If bit 16 of reg 12 in CPR0 is set, writes are directed to the data cache
 	if (CPR0(12) & 0x10000)
 	{
-		log_warning("Unhandled isolated cache mem read at %x\n", address);
+		//log_warning("Unhandled isolated cache mem read at %x\n", address);
 		return 0xFFFFFFFF;
 	}
 
@@ -315,7 +315,7 @@ void write_word(uint32_t address, uint32_t value)
 	// If bit 16 of reg 12 in CPR0 is set, writes are directed to the data cache
 	if (CPR0(12) & 0x10000)
 	{
-		log_warning("Unhandled isolated cache mem write at %x value %x\n", address, value);
+		//log_warning("Unhandled isolated cache mem write at %x value %x\n", address, value);
 		return;
 	}
 
@@ -334,4 +334,22 @@ void write_word(uint32_t address, uint32_t value)
 void load_bios_into_mem(FILE* bios_file)
 {
 	fread(&bios_rom, sizeof(uint8_t), 512 * KIB_SIZE, bios_file);
+}
+
+void sideload_exe_into_mem(exe_header file_header, FILE* exe_file)
+{
+	// Set the registers using the header info
+	cpu_state.pc = file_header.initial_pc;
+	R28 = file_header.initial_r28;
+	R29 = file_header.initial_r29_r30_address + file_header.initial_r29_r30_offset;
+	R30 = file_header.initial_r29_r30_address + file_header.initial_r29_r30_offset;
+
+	// Get the mapped address in RAM, and file size
+	uint32_t destination_address = file_header.destination_address - 0x80000000;
+	uint32_t file_size = file_header.file_size * 0x800;
+
+	// Seek the end of the header to load the actual EXE data
+	fseek(exe_file, 0x800, SEEK_SET);
+	// Load the EXE data into RAM
+	fread(&ram[destination_address], sizeof(uint8_t), file_size, exe_file);
 }
