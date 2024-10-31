@@ -3,7 +3,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "cpu.h"
+
 #define MAX_BREAKPOINTS 32
+#define CPU_TRACE_SIZE 40
 
 typedef struct
 {
@@ -15,10 +18,35 @@ typedef struct
 
 typedef struct
 {
+	/// <summary>
+	/// Stores information about the breakpoints used by the debugger
+	/// </summary>
 	breakpoint code_breakpoints[MAX_BREAKPOINTS];
+
+	/// <summary>
+	/// The number of breakpoints used
+	/// </summary>
 	int breakpoint_count;
+
+	/// <summary>
+	/// Whether we are in currently in debug mode
+	/// </summary>
 	bool in_debug;
+
+	/// <summary>
+	/// Whether we should print the executed instructions to console
+	/// </summary>
 	bool print_instructions;
+
+	/// <summary>
+	/// Contains a trace of the CPU state during the last few instructions
+	/// </summary>
+	cpu cpu_trace[CPU_TRACE_SIZE];
+
+	/// <summary>
+	/// The current index of the earliest instruction in the CPU trace
+	/// </summary>
+	int trace_start;
 } debug_struct;
 
 extern debug_struct debug_state;
@@ -27,6 +55,12 @@ extern debug_struct debug_state;
 /// Queries user input for the debugger
 /// </summary>
 void handle_debug_input();
+
+/// <summary>
+/// Adds a new state to the CPU trace
+/// </summary>
+/// <param name="cpu_state">The current CPU state to be saved</param>
+void add_cpu_trace(cpu cpu_state);
 
 /// <summary>
 /// Checks an address and triggers breakpoints if necessary

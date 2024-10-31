@@ -163,4 +163,5 @@ void nor();
 void slt();
 void sltu();
 
+void print_debug_info(cpu cpu_state);
 void handle_instruction(bool debug_info);

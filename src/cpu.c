@@ -185,7 +185,7 @@ void b_cond_z()
     uint32_t condition = rt(cpu_state.current_opcode);
 
     // The jump/branch offset
-    uint16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
+    int16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
     int32_t offset_18 = (int32_t)(offset_16 << 2);
 
     bool passes_check = false;
@@ -890,8 +890,13 @@ void sltu()
     R(rd(cpu_state.current_opcode)) = rs_val < rt_val;
 }
 
-static void print_debug_info(uint8_t primary_opcode, uint8_t secondary_opcode)
+void print_debug_info(cpu cpu_state)
 {
+    // Get primary opcode from 6 highest bits
+    uint8_t primary_opcode = (cpu_state.current_opcode & 0xFC000000) >> 26;
+    // Get secondary opcode from 6 lowest bits
+    uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
+
     char* disassembly = primary_opcodes[primary_opcode].disassembly;
     if (primary_opcode == 0x00)
         disassembly = secondary_opcodes[secondary_opcode].disassembly;
@@ -933,7 +938,7 @@ void handle_instruction(bool debug_info)
     uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
 
     if (debug_info)
-        print_debug_info(primary_opcode, secondary_opcode);
+        print_debug_info(cpu_state);
 
     check_tty_output();
 

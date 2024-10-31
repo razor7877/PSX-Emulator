@@ -66,6 +66,8 @@ int main(int argc, char** argv)
 		if (!debug_state.in_debug)
 		{
 			handle_instruction(debug_state.print_instructions);
+
+			add_cpu_trace(cpu_state);
 			check_code_breakpoints(cpu_state.pc);
 		}
 		else

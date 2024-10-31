@@ -15,6 +15,21 @@ debug_struct debug_state = {
 
 char input[256] = {0};
 
+char* menu_string = {
+				"Use the following commands to interact with the debugger:\n\t"
+				"s - set breakpoint\n\t"
+				"u - unset breakpoint\n\t"
+				"l - list breakpoints\n\t"
+				"c - continue execution\n\t"
+				"n - step next instruction\n\t"
+				"o - step out\n\t"
+				"r - show registers\n\t"
+				"t - show cpu trace\n"
+};
+
+/// <summary>
+/// Queries user input to create a new code breakpoint
+/// </summary>
 static void set_breakpoint_user()
 {
 	log_info_no_prefix("Address to break on: ");
@@ -26,6 +41,9 @@ static void set_breakpoint_user()
 	add_breakpoint(address, true, false);
 }
 
+/// <summary>
+/// Queries user input to delete/disable an existing breakpoint
+/// </summary>
 static void delete_breakpoint_user()
 {
 	log_info_no_prefix("Index to delete: ");
@@ -38,6 +56,9 @@ static void delete_breakpoint_user()
 	delete_breakpoint(index);
 }
 
+/// <summary>
+/// Prints the current breakpoints to the console
+/// </summary>
 static void show_breakpoints()
 {
 	log_info_no_prefix("Showing breakpoints:\n");
@@ -48,25 +69,31 @@ static void show_breakpoints()
 	}
 }
 
+/// <summary>
+/// Resumes normal execution
+/// </summary>
 static void continue_execution()
 {
 	log_info_no_prefix("Resume execution\n");
 	debug_state.in_debug = false;
 }
 
-static void show_cpu_state()
+/// <summary>
+/// Prints the CPU state to the console
+/// </summary>
+static void show_cpu_state(cpu state)
 {
 	for (int i = 0; i < 8; i ++)
 	{
 		log_info_no_prefix("R%02d: %08x R%02d: %08x R%02d: %08x R%02d: %08x\n",
-			i * 4, cpu_state.registers[i * 4],
-			i * 4 + 1, cpu_state.registers[i * 4 + 1],
-			i * 4 + 2, cpu_state.registers[i * 4 + 2],
-			i * 4 + 3, cpu_state.registers[i * 4 + 3]
+			i * 4, state.registers[i * 4],
+			i * 4 + 1, state.registers[i * 4 + 1],
+			i * 4 + 2, state.registers[i * 4 + 2],
+			i * 4 + 3, state.registers[i * 4 + 3]
 		);
 	}
 
-	log_info_no_prefix("\tpc: %x --- hi: %x --- lo: %x\n", cpu_state.pc, cpu_state.hi, cpu_state.lo);
+	log_info_no_prefix("\tpc: %x --- hi: %x --- lo: %x\n", state.pc, state.hi, state.lo);
 }
 
 void handle_debug_input()
@@ -100,18 +127,39 @@ void handle_debug_input()
 			break;
 
 		case 'o': // Step out
-			while (cpu_state.pc != R31)
+		{
+			uint32_t return_address = R31;
+			while (cpu_state.pc != return_address)
 				handle_instruction(false);
 			break;
+		}
 
 		case 'r': // Show registers / CPU state
-			show_cpu_state();
+			show_cpu_state(cpu_state);
+			break;
+
+		case 't': // Shows the CPU trace (last executed functions)
+			for (int i = 0; i < CPU_TRACE_SIZE; i++)
+			{
+				int index = (i + debug_state.trace_start) % CPU_TRACE_SIZE;
+				cpu state = debug_state.cpu_trace[index];
+				print_debug_info(state);
+				log_info_no_prefix("\n");
+				show_cpu_state(state);
+				log_info_no_prefix("\n");
+			}
 			break;
 
 		default:
-			log_info_no_prefix("Use the following commands to interact with the debugger:\n\ts - set breakpoint\n\tu - unset breakpoint\n\tl - list breakpoints\n\tc - continue execution\n\tn - step next instruction\n\to - step out\n\tr - show registers\n");
+			log_info_no_prefix(menu_string);
 			break;
 	}
+}
+
+void add_cpu_trace(cpu cpu_state)
+{
+	debug_state.trace_start = (debug_state.trace_start + 1) % CPU_TRACE_SIZE;
+	debug_state.cpu_trace[debug_state.trace_start] = cpu_state;
 }
 
 void check_code_breakpoints(uint32_t address)
