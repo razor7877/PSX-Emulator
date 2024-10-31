@@ -44,23 +44,6 @@ int main(int argc, char** argv)
 	// BIOS finished execution
 	add_breakpoint(0x80030000, true, false);
 
-	// KernelRedirect
-	//add_breakpoint(0x2834, true, false);
-	// RemoveDevice
-	//add_breakpoint(0x2910, true, false);
-
-	// printf version of bios
-	//add_breakpoint(0xBFC018E0, true, false);
-	//add_breakpoint(0xBFC00E64, true, false);
-	//add_breakpoint(0xBFC00E1C, true, false);
-	//add_breakpoint(0x2940, true, false);
-
-	//add_breakpoint(0x3CAC, true, false);
-	//add_breakpoint(0xBFC02B7C, true, false);
-	//add_breakpoint(0xBFC00E50, false, true);
-	//add_breakpoint(0x1230, true, false);
-	add_breakpoint(0xBFC0DF20, false, true);
-
 	for (;;)
 	{
 		if (!debug_state.in_debug)

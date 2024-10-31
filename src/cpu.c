@@ -406,13 +406,13 @@ void lb()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint8_t byte_index = 3 - address % 4;
-    uint32_t word = (uint32_t)read_word(address & ~0b11);
+    uint8_t byte_index = address & 0b11;
+    uint32_t word = (uint32_t)read_word(address - byte_index);
 
     // First byte in first 8 bits, second in the next 8 and so on
-    uint32_t mask = 0xFF000000 >> (byte_index * 8);
+    uint32_t mask = 0xFF << (byte_index * 8);
     // Shift the value to bring it to an 8 bit value
-    int8_t byte = (word & mask) >> (24 - byte_index * 8);
+    int8_t byte = (word & mask) >> (byte_index * 8);
 
     int32_t sign_extended = (int32_t)byte;
 
@@ -430,13 +430,13 @@ void lh()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint16_t byte_index = 1 - address % 2;
-    uint32_t word = (uint32_t)read_word(address & ~0b11);
+    uint16_t byte_index = address & 0b1;
+    uint32_t word = (uint32_t)read_word(address - byte_index);
 
     // First byte in first 8 bits, second in the next 8 and so on
-    uint32_t mask = 0xFFFF0000 >> (byte_index * 16);
+    uint32_t mask = 0xFFFF << (byte_index * 16);
     // Shift the value to bring it to an 8 bit value
-    int16_t half_word = (word & mask) >> (16 - byte_index * 16);
+    int16_t half_word = (word & mask) >> (byte_index * 16);
 
     int32_t sign_extended = (int32_t)half_word;
     delay_reg_fetch(rt(cpu_state.current_opcode), sign_extended);
@@ -475,13 +475,13 @@ void lbu()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint8_t byte_index = 3 - address % 4;
-    uint32_t word = (uint32_t)read_word(address & ~0b11);
+    uint8_t byte_index = address & 0b11;
+    uint32_t word = (uint32_t)read_word(address - byte_index);
 
     // First byte in first 8 bits, second in the next 8 and so on
-    uint32_t mask = 0xFF000000 >> (byte_index * 8);
+    uint32_t mask = 0xFF << (byte_index * 8);
     // Shift the value to bring it to an 8 bit value
-    uint32_t byte = (word & mask) >> (24 - byte_index * 8);
+    uint32_t byte = (word & mask) >> (byte_index * 8);
 
     delay_reg_fetch(rt(cpu_state.current_opcode), byte);
 }
@@ -497,13 +497,13 @@ void lhu()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint16_t byte_index = 1 - address % 2;
-    uint32_t word = (uint32_t)read_word(address & ~0b11);
+    uint16_t byte_index = address & 0b1;
+    uint32_t word = (uint32_t)read_word(address - byte_index);
 
     // First byte in first 8 bits, second in the next 8 and so on
-    uint32_t mask = 0xFFFF0000 >> (byte_index * 16);
+    uint32_t mask = 0xFFFF << (byte_index * 16);
     // Shift the value to bring it to an 8 bit value
-    uint16_t half_word = (word & mask) >> (16 - byte_index * 16);
+    uint16_t half_word = (word & mask) >> (byte_index * 16);
 
     delay_reg_fetch(rt(cpu_state.current_opcode), half_word);
 }
@@ -527,20 +527,19 @@ void sb()
     uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFF;
 
     // Where the byte is located in the word
-    int byte_index = 3 - address % 4;
+    int byte_index = address & 0b11;
     // The address of the aligned word where the byte will be stored
-    int word_index = address & ~0b11;
+    int word_index = address - byte_index;
 
     // A mask to keep all the original bits except the ones we're replacing
-    uint32_t original_value_mask = 0xFFFFFFFF & ~(0xFF000000 >> (byte_index * 8));
+    uint32_t original_value_mask = ~(0xFF << (byte_index * 8));
     // The bits of the new value shifted to the right position
-    uint32_t indexed_value = value << (24 - byte_index * 8);
+    uint32_t indexed_value = value << (byte_index * 8);
 
     // Original value in memory
     uint32_t word_value = read_word(word_index);
     uint32_t new_value = (word_value & original_value_mask) | indexed_value;
 
-    //log_debug("Byte value is %x with index %x --- Value before sb %x --- After sb %x\n", value, byte_index, word_value, new_value);
     write_word(word_index, new_value);
 }
 
@@ -557,20 +556,18 @@ void sh()
     uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFFFF;
 
     // Where the half word is located in the word
-    int half_word_index = 1 - address % 2;
+    int half_word_index = address & 0b11;
     // The address of the aligned word where the half word will be stored
-    int word_index = address & ~0b11;
+    int word_index = address - half_word_index;
 
     // A mask to keep all the original bits except the ones we're replacing
-    uint32_t original_value_mask = 0xFFFFFFFF & ~(0xFFFF0000 >> (half_word_index * 16));
+    uint32_t original_value_mask = ~(0xFFFF << (half_word_index * 16));
     // The bits of the new value shifted to the right position
-    uint32_t indexed_value = value << (16 - half_word_index * 16);
+    uint32_t indexed_value = value << (half_word_index * 16);
 
     // Original value in memory
     uint32_t word_value = read_word(word_index);
     uint32_t new_value = (word_value & original_value_mask) | indexed_value;
-
-    log_debug("Half word value is %x with index %x --- Value before sb %x --- After sb %x\n", value, half_word_index, word_value, new_value);
 
     if ((address & 0b1) != 0)
         log_error("Unaligned address exception with sh instruction!\n");
