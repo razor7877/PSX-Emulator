@@ -116,6 +116,12 @@ void handle_cop3_instruction()
     log_warning("Unhandled COP3 instruction\n");
 }
 
+void handle_mem_exception(ExceptionType exception, uint32_t address)
+{
+    BAD_VADDR = address;
+    handle_exception(exception);
+}
+
 void handle_exception(ExceptionType exception)
 {
     log_debug("Handling exception at PC %x\n", cpu_state.pc);
@@ -141,12 +147,9 @@ void handle_exception(ExceptionType exception)
             break;
 
         case ADEL: // Address error - Data load/Instruction fetch
-            log_error("Unhandled ADEL exception!\n");
-            debug_state.in_debug = true;
             break;
 
         case ADES: // Address error - Data store
-            log_error("Unhandled ADES exception!\n");
             break;
 
         case IBE: // Bus error on instruction fetch
@@ -158,7 +161,6 @@ void handle_exception(ExceptionType exception)
             break;
 
         case SYSCALL: // System call
-            log_debug("Handled syscall exception!\n");
             break;
 
         case BP: // Breakpoint
@@ -175,7 +177,6 @@ void handle_exception(ExceptionType exception)
             break;
 
         case OVERFLOW: // Arithmetic overflow
-            log_error("Unhandled overflow exception!\n");
             break;
 
         default:

@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "debug.h"
 #include "logging.h"
@@ -98,6 +99,7 @@ static void show_cpu_state(cpu state)
 
 void handle_debug_input()
 {
+	memset(input, 0, sizeof(input));
 	fgets(input, sizeof(input), stdin);
 
 	switch (input[0])
@@ -106,7 +108,7 @@ void handle_debug_input()
 			set_breakpoint_user();
 			break;
 
-		case 'd':
+		case 'd': // Print executed instructions
 			debug_state.print_instructions = !debug_state.print_instructions;
 			break;
 
@@ -139,14 +141,19 @@ void handle_debug_input()
 			break;
 
 		case 't': // Shows the CPU trace (last executed functions)
-			for (int i = 0; i < CPU_TRACE_SIZE; i++)
+			if (input[1] == 't' && input[2] == 'y')
+				print_tty_output();
+			else
 			{
-				int index = (i + debug_state.trace_start) % CPU_TRACE_SIZE;
-				cpu state = debug_state.cpu_trace[index];
-				print_debug_info(state);
-				log_info_no_prefix("\n");
-				show_cpu_state(state);
-				log_info_no_prefix("\n");
+				for (int i = 0; i < CPU_TRACE_SIZE; i++)
+				{
+					int index = (i + debug_state.trace_start) % CPU_TRACE_SIZE;
+					cpu state = debug_state.cpu_trace[index];
+					print_debug_info(state);
+					log_info_no_prefix("\n");
+					show_cpu_state(state);
+					log_info_no_prefix("\n");
+				}
 			}
 			break;
 

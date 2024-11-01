@@ -6,6 +6,8 @@
 #include "coprocessor.h"
 #include "debug.h"
 
+#define TTY_BUFFER_SIZE 2048
+
 cpu cpu_state = {
     .registers = {0},
     .current_opcode = 0x00,
@@ -16,8 +18,114 @@ cpu cpu_state = {
     .jmp_address = 0x00
 };
 
+char tty[TTY_BUFFER_SIZE] = { 0 };
+int char_index = 0;
+
+void reset_cpu_state()
+{
+    for (int i = 0; i < 32; i++)
+        cpu_state.registers[i] = 0;
+
+    cpu_state.pc = 0xBFC00000;
+    cpu_state.hi =  0;
+    cpu_state.lo =  0;
+    cpu_state.current_opcode = 0;
+    cpu_state.delay_jump = false;
+    cpu_state.jmp_address = 0;
+    cpu_state.delay_fetch = 0;
+    cpu_state.fetch_reg_index = 0;
+    cpu_state.fetch_reg_value = 0;
+}
+
+static void delay_reg_fetch(int reg_index, uint32_t value)
+{
+    cpu_state.delay_fetch = 2;
+    cpu_state.fetch_reg_index = reg_index;
+    cpu_state.fetch_reg_value = value;
+}
+
+static void check_tty_output()
+{
+    // Check for a putchar() call
+    if ((cpu_state.pc == 0xA0 && R9 == 0x3C) || (cpu_state.pc == 0xB0 && R9 == 0x3D))
+    {
+        tty[char_index] = (char)(uint8_t)R4;
+        char_index = (char_index + 1) % TTY_BUFFER_SIZE;
+    }
+}
+
+void print_debug_info(cpu cpu_state)
+{
+    // Get primary opcode from 6 highest bits
+    uint8_t primary_opcode = (cpu_state.current_opcode & 0xFC000000) >> 26;
+    // Get secondary opcode from 6 lowest bits
+    uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
+
+    char* disassembly = primary_opcodes[primary_opcode].disassembly;
+    if (primary_opcode == 0x00)
+        disassembly = secondary_opcodes[secondary_opcode].disassembly;
+
+    log_info("Executing opcode %s - %x\n\tAddress %x\n\tRS(r%d): %x RT(r%d): %x RD(r%d): %x\n",
+        disassembly, cpu_state.current_opcode, cpu_state.pc,
+        rs(cpu_state.current_opcode), R(rs(cpu_state.current_opcode)),
+        rt(cpu_state.current_opcode), R(rt(cpu_state.current_opcode)),
+        rd(cpu_state.current_opcode), R(rd(cpu_state.current_opcode))
+    );
+}
+
+void print_tty_output()
+{
+    printf("--- TTY DEBUG OUTPUT ---\n%s\n--- END TTY DEBUG OUTPUT\n\n", tty);
+}
+
+void handle_instruction(bool debug_info)
+{
+    R0 = 0;
+    // Decode next instruction
+    cpu_state.current_opcode = read_word_internal(cpu_state.pc);
+
+    // Get primary opcode from 6 highest bits
+    uint8_t primary_opcode = (cpu_state.current_opcode & 0xFC000000) >> 26;
+    // Get secondary opcode from 6 lowest bits
+    uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
+
+    if (debug_info)
+        print_debug_info(cpu_state);
+
+    // Update debug data
+    check_tty_output();
+    add_cpu_trace(cpu_state);
+    check_code_breakpoints(cpu_state.pc);
+
+    // Jump if we have a jump in delay slot, otherwise increment pc normally
+    if (cpu_state.delay_jump)
+    {
+        cpu_state.delay_jump = false;
+        cpu_state.pc = cpu_state.jmp_address;
+    }
+    else
+        cpu_state.pc += 0x4;
+
+    // Decode and execute
+    if (primary_opcode == 0x00)
+        ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
+    else
+        ((void (*)(void))primary_opcodes[primary_opcode].function)();
+
+    // Ugly, used so that a memory load into register gets done at the end of the next instruction
+    if (cpu_state.delay_fetch != 0 && --cpu_state.delay_fetch >= 1)
+    {
+        R(cpu_state.fetch_reg_index) = cpu_state.fetch_reg_value;
+        cpu_state.delay_fetch = false;
+    }
+}
+
+/// <summary>
+/// INSTRUCTIONS LOOKUP TABLES START
+/// </summary>
+
 const instruction primary_opcodes[0x40] = {
-    { "SPECIAL", NULL },       // 00h
+    { "SPECIAL", NULL },          // 00h
     { "BCONDZ", b_cond_z },       // 01h
     { "J", j },                   // 02h
     { "JAL", jal },               // 03h
@@ -110,7 +218,7 @@ const instruction secondary_opcodes[0x40] = {
     { "N/A", undefined },         // 17h
     { "MULT", mult },             // 18h
     { "MULTU", multu },           // 19h
-    { "DIV", op_div },               // 1Ah
+    { "DIV", op_div },            // 1Ah
     { "DIVU", divu },             // 1Bh
     { "N/A", undefined },         // 1Ch
     { "N/A", undefined },         // 1Dh
@@ -121,8 +229,8 @@ const instruction secondary_opcodes[0x40] = {
     { "SUB", sub },               // 22h
     { "SUBU", subu },             // 23h
     { "AND", and },               // 24h
-    { "OR", op_or },                 // 25h
-    { "XOR", op_xor },               // 26h
+    { "OR", op_or },              // 25h
+    { "XOR", op_xor },            // 26h
     { "NOR", nor },               // 27h
     { "N/A", undefined },         // 28h
     { "N/A", undefined },         // 29h
@@ -150,25 +258,9 @@ const instruction secondary_opcodes[0x40] = {
     { "N/A", undefined }          // 3Fh
 };
 
-void reset_cpu_state()
-{
-    for (int i = 0; i < 32; i++)
-        cpu_state.registers[i] = 0;
-
-    cpu_state.pc = 0xBFC00000;
-    cpu_state.hi =  0;
-    cpu_state.lo =  0;
-    cpu_state.current_opcode = 0;
-    cpu_state.delay_jump = false;
-    cpu_state.jmp_address = 0;
-}
-
-static void delay_reg_fetch(int reg_index, uint32_t value)
-{
-    cpu_state.delay_fetch = 2;
-    cpu_state.fetch_reg_index = reg_index;
-    cpu_state.fetch_reg_value = value;
-}
+/// <summary>
+/// INSTRUCTIONS FUNCTIONS IMPLEMENTATIONS
+/// </summary>
 
 void undefined()
 {
@@ -450,7 +542,20 @@ void lh()
 
 void lwl()
 {
-    debug_state.in_debug = true;
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
+
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
+
+    int address = base_addr + offset;
+    uint32_t aligned_word = read_word(address & 0xFFFFFFFC);
+
+    int shift = (address & 0x3) << 3;
+    uint32_t mask = 0x00FFFFFF >> shift;
+    uint32_t value = (rt_val & mask) | (aligned_word << (24 - shift));
+
+    R(rt(cpu_state.current_opcode)) = value;
+
     log_warning("Unhandled instruction lwl\n");
 }
 
@@ -516,7 +621,20 @@ void lhu()
 
 void lwr()
 {
-    debug_state.in_debug = true;
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
+
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
+
+    int address = base_addr + offset;
+    uint32_t aligned_word = read_word(address & 0xFFFFFFFC);
+
+    int shift = (address & 0x3) << 3;
+    uint32_t mask = 0xFFFFFF00 << (24 - shift);
+    uint32_t value = (rt_val & mask) | (aligned_word >> shift);
+
+    R(rt(cpu_state.current_opcode)) = value;
+
     log_warning("Unhandled instruction lwr\n");
 }
 
@@ -578,7 +696,7 @@ void sh()
     if ((address & 0b1) != 0)
     {
         log_error("Unaligned address exception with sh instruction!\n");
-        handle_exception(ADES);
+        handle_mem_exception(ADES, address);
     }
     else
         write_word(word_index, new_value);
@@ -601,7 +719,7 @@ void sw()
     if ((address & 0b11) != 0)
     {
         log_error("Unaligned address exception with sw instruction!\n");
-        handle_exception(ADES);
+        handle_mem_exception(ADES, address);
     }
     else
         write_word(address, rt_val);
@@ -783,13 +901,20 @@ void op_div()
     int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
     if (rt_val == 0)
+    {
         log_error("DIV instruction attempted divide by zero!\n");
+        cpu_state.hi = 0xDEADBEEF;
+        cpu_state.lo = 0xDEADBEEF;
+    }
+    else
+    {
+        // We cast to int64_t to prevent integer overflows
+        uint32_t quotient = (int64_t)rs_val / (int64_t)rt_val;
+        uint32_t remainder = (int64_t)rs_val % (int64_t)rt_val;
 
-    uint32_t quotient = rs_val / rt_val;
-    uint32_t remainder = rs_val % rt_val;
-
-    cpu_state.hi =  remainder;
-    cpu_state.lo =  quotient;
+        cpu_state.hi = remainder;
+        cpu_state.lo = quotient;
+    }
 }
 
 void divu()
@@ -798,13 +923,20 @@ void divu()
     uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     if (rt_val == 0)
-        log_error("DIV instruction attempted divide by zero!\n");
+    {
+        log_error("DIVU instruction attempted divide by zero!\n");
+        cpu_state.hi = 0xDEADBEEF;
+        cpu_state.lo = 0xDEADBEEF;
+    }
+    else
+    {
+        // We cast to int64_t to prevent integer overflows
+        uint32_t quotient = (int64_t)rs_val / (int64_t)rt_val;
+        uint32_t remainder = (int64_t)rs_val % (int64_t)rt_val;
 
-    uint32_t quotient = rs_val / rt_val;
-    uint32_t remainder = rs_val % rt_val;
-
-    cpu_state.hi =  remainder;
-    cpu_state.lo =  quotient;
+        cpu_state.hi = remainder;
+        cpu_state.lo = quotient;
+    }
 }
 
 void add()
@@ -902,81 +1034,4 @@ void sltu()
     uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     R(rd(cpu_state.current_opcode)) = rs_val < rt_val;
-}
-
-void print_debug_info(cpu cpu_state)
-{
-    // Get primary opcode from 6 highest bits
-    uint8_t primary_opcode = (cpu_state.current_opcode & 0xFC000000) >> 26;
-    // Get secondary opcode from 6 lowest bits
-    uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
-
-    char* disassembly = primary_opcodes[primary_opcode].disassembly;
-    if (primary_opcode == 0x00)
-        disassembly = secondary_opcodes[secondary_opcode].disassembly;
-
-    log_info("Executing opcode %s - %x\n\tAddress %x\n\tRS(r%d): %x RT(r%d): %x RD(r%d): %x\n",
-        disassembly, cpu_state.current_opcode, cpu_state.pc,
-        rs(cpu_state.current_opcode), R(rs(cpu_state.current_opcode)),
-        rt(cpu_state.current_opcode), R(rt(cpu_state.current_opcode)),
-        rd(cpu_state.current_opcode), R(rd(cpu_state.current_opcode))
-    );
-}
-
-#define TTY_BUFFER_SIZE 2048
-char tty[TTY_BUFFER_SIZE] = { 0 };
-int char_index = 0;
-
-static void check_tty_output()
-{
-    // Check for a putchar() call
-    if ((cpu_state.pc == 0xA0 && R9 == 0x3C) || (cpu_state.pc == 0xB0 && R9 == 0x3D))
-    {
-        tty[char_index] = (char)(uint8_t)R4;
-        char_index = (char_index + 1) % TTY_BUFFER_SIZE;
-        //tty[char_index + 1] = "\0";
-        printf("--- TTY DEBUG OUTPUT ---\n%s\n--- END TTY DEBUG OUTPUT\n\n", tty);
-    }
-}
-
-void handle_instruction(bool debug_info)
-{
-    R0 = 0;
-    // Decode next instruction
-    cpu_state.current_opcode = read_word_internal(cpu_state.pc);
-
-    // Get primary opcode from 6 highest bits
-    uint8_t primary_opcode = (cpu_state.current_opcode & 0xFC000000) >> 26;
-    // Get secondary opcode from 6 lowest bits
-    uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
-
-    if (debug_info)
-        print_debug_info(cpu_state);
-
-    // Update debug data
-    check_tty_output();
-    add_cpu_trace(cpu_state);
-    check_code_breakpoints(cpu_state.pc);
-
-    // Jump if we have a jump in delay slot, otherwise increment pc normally
-    if (cpu_state.delay_jump)
-    {
-        cpu_state.delay_jump = false;
-        cpu_state.pc = cpu_state.jmp_address;
-    }
-    else
-        cpu_state.pc += 0x4;
-
-    // Decode and execute
-    if (primary_opcode == 0x00)
-        ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
-    else
-        ((void (*)(void))primary_opcodes[primary_opcode].function)();
-
-    // Ugly, used so that a memory load into register gets done at the end of the next instruction
-    if (cpu_state.delay_fetch != 0 && --cpu_state.delay_fetch >= 1)
-    {
-        R(cpu_state.fetch_reg_index) = cpu_state.fetch_reg_value;
-        cpu_state.delay_fetch = false;
-    }
 }

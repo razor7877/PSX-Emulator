@@ -38,4 +38,5 @@ void handle_cop1_instruction();
 void handle_cop2_instruction();
 void handle_cop3_instruction();
 
+void handle_mem_exception(ExceptionType exception, uint32_t address);
 void handle_exception(ExceptionType exception);

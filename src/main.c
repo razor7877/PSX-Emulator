@@ -99,12 +99,6 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	//add_breakpoint(0x80054528, true, false);
-	//add_breakpoint(0x800545B8, true, false);
-	//add_breakpoint(0x80030000, true, false);
-	add_breakpoint(0x80010000, true, false);
-	add_breakpoint(0x80010014, false, true);
-
 	// Emulation loop
 	for (;;)
 	{
@@ -112,8 +106,8 @@ int main(int argc, char** argv)
 		{
 			handle_instruction(debug_state.print_instructions);
 
-			if (!finished_bios_boot && cpu_state.pc == 0x80030000)
-				sideload_exe();
+			/*if (!finished_bios_boot && cpu_state.pc == 0x80030000)
+				sideload_exe();*/
 		}
 		else // In debug mode, query user input
 			handle_debug_input();

@@ -83,16 +83,60 @@ typedef struct
 	/// </summary>
 	uint32_t jmp_address;
 
+	/// <summary>
+	/// Instruction coutdown before loading value from memory into a register
+	/// </summary>
 	int delay_fetch;
 
+	/// <summary>
+	/// The register where the value should be fetched into
+	/// </summary>
 	int fetch_reg_index;
 
+	/// <summary>
+	/// The value that should be fetched in the register
+	/// </summary>
 	uint32_t fetch_reg_value;
 } cpu;
 
 extern cpu cpu_state;
 
+/// <summary>
+/// Resets the state of the CPU
+/// </summary>
 void reset_cpu_state();
+
+/// <summary>
+/// Triggers a load delay slot
+/// </summary>
+/// <param name="reg_index">The register in which the value should be fetched after the delay</param>
+/// <param name="value">The value to be fetched into the register</param>
+static void delay_reg_fetch(int reg_index, uint32_t value);
+
+/// <summary>
+/// Checks for putchar() calls to the TTY output
+/// </summary>
+static void check_tty_output();
+
+/// <summary>
+/// Prints debug info about the CPU state
+/// </summary>
+/// <param name="cpu_state">The state for which debug information should be printed</param>
+void print_debug_info(cpu cpu_state);
+
+/// <summary>
+/// Prints the current TTY output to the console
+/// </summary>
+void print_tty_output();
+
+/// <summary>
+/// Handles the next CPU instruction in the emulation loop
+/// </summary>
+/// <param name="debug_info">Whether debug information about the instruction should be printed</param>
+void handle_instruction(bool debug_info);
+
+extern const instruction primary_opcodes[0x40];
+extern const instruction secondary_opcodes[0x40];
 
 void undefined();
 
@@ -162,6 +206,3 @@ void op_xor();
 void nor();
 void slt();
 void sltu();
-
-void print_debug_info(cpu cpu_state);
-void handle_instruction(bool debug_info);
