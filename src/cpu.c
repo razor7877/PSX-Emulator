@@ -436,13 +436,13 @@ void lh()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint16_t byte_index = address & 0b1;
-    uint32_t word = (uint32_t)read_word(address - byte_index);
+    uint16_t half_word_index = (address & 0b10) >> 1;
+    uint32_t word = (uint32_t)read_word(address - half_word_index * 2);
 
     // First byte in first 8 bits, second in the next 8 and so on
-    uint32_t mask = 0xFFFF << (byte_index * 16);
+    uint32_t mask = 0xFFFF << (half_word_index * 16);
     // Shift the value to bring it to an 8 bit value
-    int16_t half_word = (word & mask) >> (byte_index * 16);
+    int16_t half_word = (word & mask) >> (half_word_index * 16);
 
     int32_t sign_extended = (int32_t)half_word;
     delay_reg_fetch(rt(cpu_state.current_opcode), sign_extended);
@@ -503,13 +503,13 @@ void lhu()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint16_t word_index = (address & 0b10) >> 1;
-    uint32_t word = (uint32_t)read_word(address - word_index * 2);
+    uint16_t half_word_index = (address & 0b10) >> 1;
+    uint32_t word = (uint32_t)read_word(address - half_word_index * 2);
 
     // First byte in first 8 bits, second in the next 8 and so on
-    uint32_t mask = 0xFFFF << (word_index * 16);
+    uint32_t mask = 0xFFFF << (half_word_index * 16);
     // Shift the value to bring it to an 8 bit value
-    uint16_t half_word = (word & mask) >> (word_index * 16);
+    uint16_t half_word = (word & mask) >> (half_word_index * 16);
 
     delay_reg_fetch(rt(cpu_state.current_opcode), half_word);
 }
@@ -876,7 +876,7 @@ void op_xor()
     uint32_t rt_val = R(rt(cpu_state.current_opcode));
 
     uint32_t result = rs_val ^ rt_val;
-    R(rt(cpu_state.current_opcode)) = result;
+    R(rd(cpu_state.current_opcode)) = result;
 }
 
 void nor()
@@ -893,7 +893,7 @@ void slt()
     int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
     int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
-    R(rt(cpu_state.current_opcode)) = rs_val < rt_val;
+    R(rd(cpu_state.current_opcode)) = rs_val < rt_val;
 }
 
 void sltu()
@@ -923,17 +923,19 @@ void print_debug_info(cpu cpu_state)
     );
 }
 
-char tty[256] = { 0 };
+#define TTY_BUFFER_SIZE 2048
+char tty[TTY_BUFFER_SIZE] = { 0 };
 int char_index = 0;
 
 static void check_tty_output()
 {
+    // Check for a putchar() call
     if ((cpu_state.pc == 0xA0 && R9 == 0x3C) || (cpu_state.pc == 0xB0 && R9 == 0x3D))
     {
         tty[char_index] = (char)(uint8_t)R4;
-        tty[char_index + 1] = "\0";
-        char_index = (char_index + 1) % 256;
-        printf("%s\n", tty);
+        char_index = (char_index + 1) % TTY_BUFFER_SIZE;
+        //tty[char_index + 1] = "\0";
+        printf("--- TTY DEBUG OUTPUT ---\n%s\n--- END TTY DEBUG OUTPUT\n\n", tty);
     }
 }
 

@@ -23,6 +23,11 @@
 /// </summary>
 void clear_memory();
 
+static uint32_t read_word_kuseg(uint32_t address);
+static uint32_t read_word_kseg0(uint32_t address);
+static uint32_t read_word_kseg1(uint32_t address);
+static uint32_t read_word_kseg2(uint32_t address);
+
 /// <summary>
 /// Reads a word at the address
 /// </summary>
@@ -30,7 +35,17 @@ void clear_memory();
 /// <returns>The word at the address</returns>
 uint32_t read_word(uint32_t address);
 
+/// <summary>
+/// Bypasses isolate cache when reading memory, used by CPU to fetch opcodes
+/// </summary>
+/// <param name="address">The address to be read</param>
+/// <returns>The word at the address</returns>
 uint32_t read_word_internal(uint32_t address);
+
+static void write_word_kuseg(uint32_t address, uint32_t value);
+static void write_word_kseg0(uint32_t address, uint32_t value);
+static void write_word_kseg1(uint32_t address, uint32_t value);
+static void write_word_kseg2(uint32_t address, uint32_t value);
 
 /// <summary>
 /// Writes a word at the address with the value given in the KUSEG

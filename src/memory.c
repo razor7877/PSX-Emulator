@@ -1,11 +1,13 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "memory.h"
 #include "logging.h"
 #include "debug.h"
 #include "coprocessor.h"
 #include "cpu.h"
+#include "io.h"
 
 /// <summary>
 /// 2048 KiB
@@ -75,7 +77,7 @@ static uint32_t read_word_kuseg(uint32_t address)
 	else if (address >= 0x1F800000 && address < 0x1F800000 + SCRATCHPAD_SIZE) // Scratchpad (D-cache)
 		return scratchpad[word_index - 0x1F800000 / WORD_SIZE];
 	else if (address >= 0x1F801000 && address < 0x1F801000 + IO_PORTS_SIZE) // IO ports
-		return io_ports[word_index - 0x1F801000 / WORD_SIZE];
+		return read_io(address);
 	else if (address >= 0x1F802000 && address < 0x1F802000 + EXPANSION_2_SIZE) // Expansion region 2
 		return expansion_2[word_index - 0x1F802000 / WORD_SIZE];
 	else if (address >= 0x1FA00000 && address < 0x1FA00000 + EXPANSION_3_SIZE) // Expansion region 3
@@ -105,7 +107,7 @@ static uint32_t read_word_kseg0(uint32_t address)
 	else if (address >= 0x9F800000 && address < 0x9F800000 + SCRATCHPAD_SIZE) // Scratchpad (D-cache)
 		return scratchpad[word_index - 0x9F800000 / WORD_SIZE];
 	else if (address >= 0x9F801000 && address < 0x9F801000 + IO_PORTS_SIZE) // IO ports
-		return io_ports[word_index - 0x9F801000 / WORD_SIZE];
+		return read_io(address);
 	else if (address >= 0x9F802000 && address < 0x9F802000 + EXPANSION_2_SIZE) // Expansion region 2
 		return expansion_2[word_index - 0x9F802000 / WORD_SIZE];
 	else if (address >= 0x9FA00000 && address < 0x9FA00000 + EXPANSION_3_SIZE) // Expansion region 3
@@ -133,7 +135,7 @@ static uint32_t read_word_kseg1(uint32_t address)
 	else if (address >= 0xBF000000 && address < 0xBF000000 + EXPANSION_1_SIZE) // Expansion region 1
 		return expansion_1[word_index - 0xBF000000 / WORD_SIZE];
 	else if (address >= 0xBF801000 && address < 0xBF801000 + IO_PORTS_SIZE) // IO ports
-		return io_ports[word_index - 0xBF801000 / WORD_SIZE];
+		return read_io(address);
 	else if (address >= 0xBF802000 && address < 0xBF802000 + EXPANSION_2_SIZE) // Expansion region 2
 		return expansion_2[word_index - 0xBF802000 / WORD_SIZE];
 	else if (address >= 0xBFA00000 && address < 0xBFA00000 + EXPANSION_3_SIZE) // Expansion region 3
@@ -172,13 +174,6 @@ static uint32_t read_word_kseg2(uint32_t address)
 /// <returns>The word at the address</returns>
 uint32_t read_word(uint32_t address)
 {
-	if ((address & 0b11) != 0)
-	{
-		log_error("Unaligned memory read exception! PC is %x\n", cpu_state.pc);
-		handle_exception(ADEL);
-		debug_state.in_debug = true;
-	}
-
 	// If bit 16 of reg 12 in CPR0 is set, writes are directed to the data cache
 	if (CPR0(12) & 0x10000)
 	{
@@ -192,6 +187,13 @@ uint32_t read_word(uint32_t address)
 uint32_t read_word_internal(uint32_t address)
 {
 	check_data_breakpoints(address);
+
+	if ((address & 0b11) != 0)
+	{
+		log_error("Unaligned memory read exception! PC is %x\n", cpu_state.pc);
+		handle_exception(ADEL);
+		debug_state.in_debug = true;
+	}
 
 	if (address <= 0x1FC00000) // KUSEG read
 		return read_word_kuseg(address);
@@ -224,7 +226,7 @@ static void write_word_kuseg(uint32_t address, uint32_t value)
 	else if (address >= 0x1F800000 && address < 0x1F800000 + SCRATCHPAD_SIZE) // Scratchpad (D-cache)
 		scratchpad[word_index - 0x1F800000 / WORD_SIZE] = value;
 	else if (address >= 0x1F801000 && address < 0x1F801000 + IO_PORTS_SIZE) // IO ports
-		io_ports[word_index - 0x1F801000 / WORD_SIZE] = value;
+		write_io(address, value);
 	else if (address >= 0x1F802000 && address < 0x1F802000 + EXPANSION_2_SIZE) // Expansion region 2
 		expansion_2[word_index - 0x1F802000 / WORD_SIZE] = value;
 	else if (address >= 0x1FA00000 && address < 0x1FA00000 + RAM_SIZE) // Expansion region 3
@@ -254,7 +256,7 @@ static void write_word_kseg0(uint32_t address, uint32_t value)
 	else if (address >= 0x9F800000 && address < 0x9F800000 + SCRATCHPAD_SIZE) // Scratchpad (D-cache)
 		scratchpad[word_index - 0x9F800000 / WORD_SIZE] = value;
 	else if (address >= 0x9F801000 && address < 0x9F801000 + IO_PORTS_SIZE) // IO ports
-		io_ports[word_index - 0x9F801000 / WORD_SIZE] = value;
+		write_io(address, value);
 	else if (address >= 0x9F802000 && address < 0x9F802000 + EXPANSION_2_SIZE) // Expansion region 2
 		expansion_2[word_index - 0x9F802000 / WORD_SIZE] = value;
 	else if (address >= 0x9FA00000 && address < 0x9FA00000 + RAM_SIZE) // Expansion region 3
@@ -282,7 +284,7 @@ static void write_word_kseg1(uint32_t address, uint32_t value)
 	else if (address >= 0xBF000000 && address < 0xBF000000 + EXPANSION_1_SIZE) // Expansion region 1
 		expansion_1[word_index - 0xBF000000 / WORD_SIZE] = value;
 	else if (address >= 0xBF801000 && address < 0xBF801000 + IO_PORTS_SIZE) // IO ports
-		io_ports[word_index - 0xBF801000 / WORD_SIZE] = value;
+		write_io(address, value);
 	else if (address >= 0xBF802000 && address < 0xBF802000 + EXPANSION_2_SIZE) // Expansion region 2
 		expansion_2[word_index - 0xBF802000 / WORD_SIZE] = value;
 	else if (address >= 0xBFA00000 && address < 0xBFA00000 + RAM_SIZE) // Expansion region 3
@@ -366,10 +368,13 @@ void sideload_exe_into_mem(exe_header file_header, FILE* exe_file)
 
 	// Get the mapped address in RAM, and file size
 	uint32_t destination_address = file_header.destination_address - 0x80000000;
-	uint32_t file_size = file_header.file_size * 0x800;
+	uint32_t file_size = file_header.file_size;
+
+	if ((file_size % 0x800) != 0)
+		log_error("Sideloaded EXE file size is not a multiple of 0x800!\n");
 
 	// Seek the end of the header to load the actual EXE data
 	fseek(exe_file, 0x800, SEEK_SET);
 	// Load the EXE data into RAM
-	fread(&ram[destination_address], sizeof(uint8_t), file_size, exe_file);
+	fread(&ram[destination_address / 4], sizeof(uint32_t), file_size / 4, exe_file);
 }

@@ -36,7 +36,7 @@ static int load_bios(const char* path)
 
 static void print_exe_header(exe_header file_header)
 {
-	log_info_no_prefix("--- SIDELOADED EXE INTO MEMORY ---\n");
+	log_info_no_prefix("--- SIDELOADED EXE INTO MEMORY ---\n\n");
 	log_info_no_prefix("ASCII ID: %s\n", file_header.ascii_id);
 	log_info_no_prefix("Initial PC: %x\n", file_header.initial_pc);
 	log_info_no_prefix("Initial GP/R28: %x\n", file_header.initial_r28);
@@ -48,6 +48,7 @@ static void print_exe_header(exe_header file_header)
 	log_info_no_prefix("BSS size: %x\n", file_header.bss_size);
 	log_info_no_prefix("Initial R29/R30 base: %x\n", file_header.initial_r29_r30_address);
 	log_info_no_prefix("Initial R29/R30 offset: %x\n", file_header.initial_r29_r30_offset);
+	log_info_no_prefix("\n--- SIDELOADED EXE HEADER END ---\n");
 }
 
 /// <summary>
@@ -98,6 +99,12 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
+	//add_breakpoint(0x80054528, true, false);
+	//add_breakpoint(0x800545B8, true, false);
+	//add_breakpoint(0x80030000, true, false);
+	add_breakpoint(0x80010000, true, false);
+	add_breakpoint(0x80010014, false, true);
+
 	// Emulation loop
 	for (;;)
 	{
@@ -105,8 +112,8 @@ int main(int argc, char** argv)
 		{
 			handle_instruction(debug_state.print_instructions);
 
-			//if (!finished_bios_boot && cpu_state.pc == 0x80030000)
-			//	sideload_exe();
+			if (!finished_bios_boot && cpu_state.pc == 0x80030000)
+				sideload_exe();
 		}
 		else // In debug mode, query user input
 			handle_debug_input();
