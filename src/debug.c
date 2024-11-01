@@ -16,15 +16,15 @@ debug_struct debug_state = {
 char input[256] = {0};
 
 char* menu_string = {
-				"Use the following commands to interact with the debugger:\n\t"
-				"s - set breakpoint\n\t"
-				"u - unset breakpoint\n\t"
-				"l - list breakpoints\n\t"
-				"c - continue execution\n\t"
-				"n - step next instruction\n\t"
-				"o - step out\n\t"
-				"r - show registers\n\t"
-				"t - show cpu trace\n"
+	"Use the following commands to interact with the debugger:\n\t"
+	"s - set breakpoint\n\t"
+	"u - unset breakpoint\n\t"
+	"l - list breakpoints\n\t"
+	"c - continue execution\n\t"
+	"n - step next instruction\n\t"
+	"o - step out\n\t"
+	"r - show registers\n\t"
+	"t - show cpu trace\n"
 };
 
 /// <summary>
@@ -158,8 +158,8 @@ void handle_debug_input()
 
 void add_cpu_trace(cpu cpu_state)
 {
-	debug_state.trace_start = (debug_state.trace_start + 1) % CPU_TRACE_SIZE;
 	debug_state.cpu_trace[debug_state.trace_start] = cpu_state;
+	debug_state.trace_start = (debug_state.trace_start + 1) % CPU_TRACE_SIZE;
 }
 
 void check_code_breakpoints(uint32_t address)
@@ -200,8 +200,8 @@ void add_breakpoint(uint32_t address, bool break_on_code, bool break_on_data)
 		return;
 	}
 
-	debug_state.code_breakpoints[debug_state.breakpoint_count].enabled = true;
 	debug_state.code_breakpoints[debug_state.breakpoint_count].address = address;
+	debug_state.code_breakpoints[debug_state.breakpoint_count].enabled = true;
 	debug_state.code_breakpoints[debug_state.breakpoint_count].break_on_code = break_on_code;
 	debug_state.code_breakpoints[debug_state.breakpoint_count].break_on_data = break_on_data;
 
@@ -216,7 +216,7 @@ void delete_breakpoint(int index)
 		return;
 	}
 
-	debug_state.code_breakpoints[index].address = true;
+	debug_state.code_breakpoints[index].address = 0;
 	debug_state.code_breakpoints[index].enabled = false;
 	debug_state.code_breakpoints[index].break_on_code = false;
 	debug_state.code_breakpoints[index].break_on_data = false;

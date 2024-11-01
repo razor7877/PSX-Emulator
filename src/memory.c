@@ -84,6 +84,7 @@ static uint32_t read_word_kuseg(uint32_t address)
 		return bios_rom[word_index - 0x1FC00000 / WORD_SIZE];
 
 	log_error("Attempted reading word outside of usable address space in KUSEG! Address %x\n", address);
+	handle_exception(ADEL);
 
 	return 0xFFFFFFFF;
 }
@@ -113,6 +114,7 @@ static uint32_t read_word_kseg0(uint32_t address)
 		return bios_rom[word_index - 0x9FC00000 / WORD_SIZE];
 
 	log_error("Attempted reading word outside of usable address space in KSEG0! Address %x\n", address);
+	handle_exception(ADEL);
 
 	return 0xFFFFFFFF;
 }
@@ -140,6 +142,7 @@ static uint32_t read_word_kseg1(uint32_t address)
 		return bios_rom[word_index - 0xBFC00000 / WORD_SIZE];
 
 	log_error("Attempted reading word outside of usable address space in KSEG1! Address %x\n", address);
+	handle_exception(ADEL);
 
 	return 0xFFFFFFFF;
 }
@@ -157,6 +160,7 @@ static uint32_t read_word_kseg2(uint32_t address)
 		return cpu_cache_control[word_index - 0xFFFE0000 / WORD_SIZE];
 
 	log_error("Attempted reading word outside of usable address space in KSEG2! Address %x\n", address);
+	handle_exception(ADEL);
 
 	return 0xFFFFFFFF;
 }
@@ -171,6 +175,7 @@ uint32_t read_word(uint32_t address)
 	if ((address & 0b11) != 0)
 	{
 		log_error("Unaligned memory read exception! PC is %x\n", cpu_state.pc);
+		handle_exception(ADEL);
 		debug_state.in_debug = true;
 	}
 
@@ -198,6 +203,7 @@ uint32_t read_word_internal(uint32_t address)
 		return read_word_kseg2(address);
 
 	log_error("Attempted reading word outside of any memory segment! Address %x --- pc is %x\n", address, cpu_state.pc);
+	handle_exception(ADEL);
 
 	return 0xFFFFFFFF;
 }
@@ -226,7 +232,10 @@ static void write_word_kuseg(uint32_t address, uint32_t value)
 	else if (address >= 0x1FC00000 && address < 0x1FC00000 + BIOS_ROM_SIZE) // BIOS ROM
 		bios_rom[word_index - 0x1FC00000 / WORD_SIZE] = value;
 	else
+	{
 		log_error("Attempted to write outside of usable address space in KUSEG! ADDRESS %x VALUE %x\n", address, value);
+		handle_exception(ADES);
+	}
 }
 
 /// <summary>
@@ -253,7 +262,10 @@ static void write_word_kseg0(uint32_t address, uint32_t value)
 	else if (address >= 0x9FC00000 && address < 0x9FC00000 + BIOS_ROM_SIZE) // BIOS ROM
 		bios_rom[word_index - 0x9FC00000 / WORD_SIZE] = value;
 	else
+	{
 		log_error("Attempted to write outside of usable address space in KSEG0! ADDRESS %x VALUE %x\n", address, value);
+		handle_exception(ADES);
+	}
 }
 
 /// <summary>
@@ -278,7 +290,10 @@ static void write_word_kseg1(uint32_t address, uint32_t value)
 	else if (address >= 0xBFC00000 && address < 0xBFC00000 + BIOS_ROM_SIZE) // BIOS ROM
 		bios_rom[word_index - 0xBFC00000 / WORD_SIZE] = value;
 	else
+	{
 		log_error("Attempted to write outside of usable address space in KSEG1! ADDRESS %x VALUE %x\n", address, value);
+		handle_exception(ADES);
+	}
 }
 
 /// <summary>
@@ -293,7 +308,10 @@ static void write_word_kseg2(uint32_t address, uint32_t value)
 	if (address >= 0xFFFE0000 && address <= 0xFFFE0000 + CONTROL_REGISTERS_SIZE)
 		cpu_cache_control[word_index - 0xFFFE0000 / WORD_SIZE] = value;
 	else
+	{
 		log_error("Attempted to write outside of usable address space in KSEG2! ADDRESS %x VALUE %x\n", address, value);
+		handle_exception(ADES);
+	}
 }
 
 /// <summary>
@@ -306,6 +324,7 @@ void write_word(uint32_t address, uint32_t value)
 	if ((address & 0b11) != 0)
 	{
 		log_error("Unaligned memory write exception! PC is %x\n", cpu_state.pc);
+		handle_exception(ADES);
 		debug_state.in_debug = true;
 		return;
 	}
@@ -329,6 +348,7 @@ void write_word(uint32_t address, uint32_t value)
 		return write_word_kseg2(address, value);
 
 	log_error("Attempted writing word outside of any memory segment! Address %x Value %x --- pc is %x\n", address, value, cpu_state.pc);
+	handle_exception(ADES);
 }
 
 void load_bios_into_mem(FILE* bios_file)

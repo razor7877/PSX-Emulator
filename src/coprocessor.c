@@ -7,7 +7,7 @@
 
 uint32_t _cop0_registers[64] = { 0 };
 
-void mfc()
+static void mfc()
 {
     uint32_t source_reg = rd(cpu_state.current_opcode);
 
@@ -17,7 +17,7 @@ void mfc()
         R(rt(cpu_state.current_opcode)) = CPR0(source_reg);
 }
 
-void cfc()
+static void cfc()
 {
     uint32_t source_reg = rd(cpu_state.current_opcode);
 
@@ -27,7 +27,7 @@ void cfc()
         R(rt(cpu_state.current_opcode)) = CPR0(source_reg);
 }
 
-void mtc()
+static void mtc()
 {
     uint32_t dest_reg = rd(cpu_state.current_opcode);
 
@@ -37,7 +37,7 @@ void mtc()
         CPR0(dest_reg) = R(rt(cpu_state.current_opcode));
 }
 
-void ctc()
+static void ctc()
 {
     uint32_t dest_reg = rd(cpu_state.current_opcode);
 
@@ -47,37 +47,57 @@ void ctc()
         CPR0(dest_reg) = R(rt(cpu_state.current_opcode));
 }
 
+static void rfe()
+{
+    // Old interrupt enable & kernel/user mode bits
+    uint8_t old = (SR & 0b110000) >> 4;
+    // Previous interrupt enable & kernel/user mode bits
+    uint8_t previous = (SR & 0b001100) >> 2;
+
+    // Clear previous & current interrupt enable & kernel/user mode bits
+    SR &= ~0b1111;
+    // Old into previous
+    SR |= old << 2;
+    // Previous into current
+    SR |= previous;
+}
+
 void handle_cop0_instruction()
 {
     uint8_t opcode = cop0_code(cpu_state.current_opcode);
 
     switch (opcode)
     {
-    case 0b00000:
-        mfc();
-        break;
+        case 0b00000:
+            mfc();
+            break;
 
-    case 0b00010:
-        cfc();
-        break;
+        case 0b00010:
+            cfc();
+            break;
 
-    case 0b00100:
-        mtc();
-        break;
+        case 0b00100:
+            mtc();
+            break;
 
-    case 0b00110:
-        ctc();
-        break;
+        case 0b00110:
+            ctc();
+            break;
 
-    case 0b01000:
-        debug_state.in_debug = true;
-        log_warning("Unhandled COP0 instruction bcnf/bcnt\n");
-        break;
+        case 0b01000:
+            debug_state.in_debug = true;
+            log_warning("Unhandled COP0 instruction bcnf/bcnt\n");
+            break;
 
-    default:
-        debug_state.in_debug = true;
-        log_error("Unhandled COP0 instruction with opcode %x\n", cpu_state.current_opcode);
-        break;
+        case 0b10000:
+            log_debug("Return from exception!\n");
+            rfe();
+            break;
+
+        default:
+            debug_state.in_debug = true;
+            log_error("Unhandled COP0 instruction with opcode %x\n", cpu_state.current_opcode);
+            break;
     }
 }
 
@@ -94,4 +114,88 @@ void handle_cop2_instruction()
 void handle_cop3_instruction()
 {
     log_warning("Unhandled COP3 instruction\n");
+}
+
+void handle_exception(ExceptionType exception)
+{
+    log_debug("Handling exception at PC %x\n", cpu_state.pc);
+
+    if (CAUSE & (1 << 31)) // Check if BD bit is set in CAUSE register (cop0r13)
+        EPC = cpu_state.pc - 8;
+    else
+        EPC = cpu_state.pc - 4;
+
+    // Clear exception code bits
+    CAUSE &= ~(0b11111 << 2);
+    // Set the current exception code
+    CAUSE |= (exception << 2);
+
+    // Boot exception vectors in RAM/ROM
+    bool bev = SR & (1 << 22);
+    bool is_cop0_break = false;
+
+    switch (exception)
+    {
+        case INTERRUPT: // Interrupt
+            log_error("Unhandled interrupt exception!\n");
+            break;
+
+        case ADEL: // Address error - Data load/Instruction fetch
+            log_error("Unhandled ADEL exception!\n");
+            debug_state.in_debug = true;
+            break;
+
+        case ADES: // Address error - Data store
+            log_error("Unhandled ADES exception!\n");
+            break;
+
+        case IBE: // Bus error on instruction fetch
+            log_error("Unhandled IBE exception!\n");
+            break;
+
+        case DBE: // Bus error on data load/store
+            log_error("Unhandled DBE exception!\n");
+            break;
+
+        case SYSCALL: // System call
+            log_debug("Handled syscall exception!\n");
+            break;
+
+        case BP: // Breakpoint
+            is_cop0_break = true;
+            log_error("Unhandled breakpoint exception!\n");
+            break;
+
+        case RI: // Reserved instruction
+            log_error("Unhandled reserved instruction exception!\n");
+            break;
+
+        case CPU: // Coprocessor unusable
+            log_error("Unhandled coprocessor unusable exception!\n");
+            break;
+
+        case OVERFLOW: // Arithmetic overflow
+            log_error("Unhandled overflow exception!\n");
+            break;
+
+        default:
+            log_error("Unhandled exception!\n");
+            break;
+    }
+
+    // Jump to the corresponding exception vector
+    if (is_cop0_break)
+    {
+        if (bev)
+            cpu_state.pc = 0xBFC00140;
+        else
+            cpu_state.pc = 0x80000040;
+    }
+    else
+    {
+        if (bev)
+            cpu_state.pc = 0xBFC00180;
+        else
+            cpu_state.pc = 0x80000080;
+    }
 }

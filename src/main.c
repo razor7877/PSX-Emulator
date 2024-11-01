@@ -98,9 +98,6 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	// BIOS finished execution
-	//add_breakpoint(0x80030000, true, false);
-
 	// Emulation loop
 	for (;;)
 	{
@@ -108,12 +105,8 @@ int main(int argc, char** argv)
 		{
 			handle_instruction(debug_state.print_instructions);
 
-			// Update debug data
-			add_cpu_trace(cpu_state);
-			check_code_breakpoints(cpu_state.pc);
-
-			if (!finished_bios_boot && cpu_state.pc == 0x80030000)
-				sideload_exe();
+			//if (!finished_bios_boot && cpu_state.pc == 0x80030000)
+			//	sideload_exe();
 		}
 		else // In debug mode, query user input
 			handle_debug_input();

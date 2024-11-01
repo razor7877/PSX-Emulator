@@ -325,9 +325,15 @@ void addi()
     int64_t sum = (uint64_t)(rs_val + signed_add);
 
     if (sum > 0xFFFFFFFF)
+    {
         log_warning("ADDI instruction resulted in overflow!\n");
+        handle_exception(OVERFLOW);
+    }
     else if (signed_add < 0 && sum < signed_add)
+    {
         log_warning("ADDI instruction resulted in underflow!\n");
+        handle_exception(OVERFLOW);
+    }
     else
         R(rt(cpu_state.current_opcode)) = sum;
 }
@@ -497,13 +503,13 @@ void lhu()
     int address = base_addr + offset;
 
     // Get the word that contains the byte
-    uint16_t byte_index = address & 0b1;
-    uint32_t word = (uint32_t)read_word(address - byte_index);
+    uint16_t word_index = (address & 0b10) >> 1;
+    uint32_t word = (uint32_t)read_word(address - word_index * 2);
 
     // First byte in first 8 bits, second in the next 8 and so on
-    uint32_t mask = 0xFFFF << (byte_index * 16);
+    uint32_t mask = 0xFFFF << (word_index * 16);
     // Shift the value to bring it to an 8 bit value
-    uint16_t half_word = (word & mask) >> (byte_index * 16);
+    uint16_t half_word = (word & mask) >> (word_index * 16);
 
     delay_reg_fetch(rt(cpu_state.current_opcode), half_word);
 }
@@ -556,9 +562,9 @@ void sh()
     uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFFFF;
 
     // Where the half word is located in the word
-    int half_word_index = address & 0b11;
+    int half_word_index = (address & 0b10) >> 1;
     // The address of the aligned word where the half word will be stored
-    int word_index = address - half_word_index;
+    int word_index = address - half_word_index * 2;
 
     // A mask to keep all the original bits except the ones we're replacing
     uint32_t original_value_mask = ~(0xFFFF << (half_word_index * 16));
@@ -570,7 +576,10 @@ void sh()
     uint32_t new_value = (word_value & original_value_mask) | indexed_value;
 
     if ((address & 0b1) != 0)
+    {
         log_error("Unaligned address exception with sh instruction!\n");
+        handle_exception(ADES);
+    }
     else
         write_word(word_index, new_value);
 }
@@ -590,7 +599,10 @@ void sw()
     uint32_t address = base_addr + offset;
 
     if ((address & 0b11) != 0)
+    {
         log_error("Unaligned address exception with sw instruction!\n");
+        handle_exception(ADES);
+    }
     else
         write_word(address, rt_val);
 }
@@ -716,14 +728,13 @@ void jalr()
 
 void syscall()
 {
-    debug_state.in_debug = true;
-    log_warning("Unhandled syscall instruction!\n");
+    handle_exception(SYSCALL);
 }
 
 void op_break()
 {
     debug_state.in_debug = true;
-    log_warning("Unhandled break instruction!\n");
+    handle_exception(BP);
 }
 
 void mfhi()
@@ -801,7 +812,10 @@ void add()
     uint64_t sum = R(rs(cpu_state.current_opcode)) + R(rt(cpu_state.current_opcode));
 
     if (sum > 0xFFFFFFFF)
+    {
         log_warning("ADD instruction resulted in overflow!\n");
+        handle_exception(OVERFLOW);
+    }
     else
         R(rd(cpu_state.current_opcode)) = sum;
 }
@@ -822,7 +836,10 @@ void sub()
     int64_t sub_result = rs_val - rt_val;
 
     if (sub_result > 0xFFFFFFFF)
+    {
         log_error("SUB instruction caused overflow!\n");
+        handle_exception(OVERFLOW);
+    }
     else
         R(rd(cpu_state.current_opcode)) = sub_result & 0xFFFFFFFF;
 }
@@ -913,14 +930,11 @@ static void check_tty_output()
 {
     if ((cpu_state.pc == 0xA0 && R9 == 0x3C) || (cpu_state.pc == 0xB0 && R9 == 0x3D))
     {
-        printf("R4 value is %x\n", R4);
         tty[char_index] = (char)(uint8_t)R4;
         tty[char_index + 1] = "\0";
         char_index = (char_index + 1) % 256;
         printf("%s\n", tty);
     }
-    //else
-    //    printf("pc = %x\n", cpu_state.pc);
 }
 
 void handle_instruction(bool debug_info)
@@ -937,7 +951,10 @@ void handle_instruction(bool debug_info)
     if (debug_info)
         print_debug_info(cpu_state);
 
+    // Update debug data
     check_tty_output();
+    add_cpu_trace(cpu_state);
+    check_code_breakpoints(cpu_state.pc);
 
     // Jump if we have a jump in delay slot, otherwise increment pc normally
     if (cpu_state.delay_jump)
@@ -948,6 +965,7 @@ void handle_instruction(bool debug_info)
     else
         cpu_state.pc += 0x4;
 
+    // Decode and execute
     if (primary_opcode == 0x00)
         ((void (*)(void))secondary_opcodes[secondary_opcode].function)();
     else
