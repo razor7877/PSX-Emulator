@@ -2,6 +2,7 @@
 #include "cpu.h"
 #include "gpu.h"
 #include "logging.h"
+#include "interrupt.h"
 
 /// <summary>
 /// Reads a word from an IO port
@@ -30,8 +31,7 @@ uint32_t read_io(uint32_t address)
 
 	if (address >= INTERRUPT_CTRL_START && address < INTERRUPT_CTRL_END)
 	{
-		log_warning("Unhandled interrupt control read at address %x\n", address);
-		return 0xFFFFFFFF;
+		return read_interrupt_control(address);
 	}
 
 	if (address >= DMA_REGS_START && address < DMA_REGS_END)
@@ -109,7 +109,7 @@ void write_io(uint32_t address, uint32_t value)
 	}
 	else if (address >= INTERRUPT_CTRL_START && address < INTERRUPT_CTRL_END)
 	{
-		log_warning("Unhandled interrupt control write at address %x\n", address);
+		write_interrupt_control(address, value);
 	}
 	else if (address >= DMA_REGS_START && address < DMA_REGS_END)
 	{

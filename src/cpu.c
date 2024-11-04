@@ -6,7 +6,7 @@
 #include "coprocessor.h"
 #include "debug.h"
 
-#define TTY_BUFFER_SIZE 2048
+#define TTY_BUFFER_SIZE (2048 * 32)
 
 cpu cpu_state = {
     .registers = {0},
@@ -296,8 +296,8 @@ void b_cond_z()
             if (rs_val < 0)
             {
                 passes_check = true;
-                is_link_condition = true;
             }
+            is_link_condition = true;
             break;
 
         case 0b00001: // BGEZ (>= 0)
@@ -309,8 +309,8 @@ void b_cond_z()
             if (rs_val >= 0)
             {
                 passes_check = true;
-                is_link_condition = true;
             }
+            is_link_condition = true;
             break;
 
         default:
@@ -677,6 +677,13 @@ void sh()
 
     int address = base_addr + offset;
 
+    if ((address & 0b1) != 0)
+    {
+        log_error("Unaligned address exception with sh instruction!\n");
+        handle_mem_exception(ADES, address);
+        return;
+    }
+
     uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFFFF;
 
     // Where the half word is located in the word
@@ -692,14 +699,8 @@ void sh()
     // Original value in memory
     uint32_t word_value = read_word(word_index);
     uint32_t new_value = (word_value & original_value_mask) | indexed_value;
-
-    if ((address & 0b1) != 0)
-    {
-        log_error("Unaligned address exception with sh instruction!\n");
-        handle_mem_exception(ADES, address);
-    }
-    else
-        write_word(word_index, new_value);
+    
+    write_word(word_index, new_value);
 }
 
 void swl()
@@ -720,9 +721,10 @@ void sw()
     {
         log_error("Unaligned address exception with sw instruction!\n");
         handle_mem_exception(ADES, address);
+        return;
     }
-    else
-        write_word(address, rt_val);
+
+    write_word(address, rt_val);
 }
 
 void swr()

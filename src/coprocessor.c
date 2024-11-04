@@ -31,6 +31,16 @@ static void mtc()
 {
     uint32_t dest_reg = rd(cpu_state.current_opcode);
 
+    if (dest_reg == 13)
+    {
+        // Clear out bits 8-9
+        CPR0(13) &= ~(0b11 << 8);
+        // Set bits 8-9 from write value
+        CPR0(13) |= R(rt(cpu_state.current_opcode)) & (0b11 << 8);
+
+        return;
+    }
+
     if (dest_reg > 31)
         log_error("MTC0 attempted to move to register outside of data registers\n");
     else
@@ -90,7 +100,7 @@ void handle_cop0_instruction()
             break;
 
         case 0b10000:
-            log_debug("Return from exception!\n");
+            log_debug("Return from exception! --- PC is %x --- Return address at %x\n", cpu_state.pc, R31);
             rfe();
             break;
 
@@ -126,15 +136,23 @@ void handle_exception(ExceptionType exception)
 {
     log_debug("Handling exception at PC %x\n", cpu_state.pc);
 
-    if (CAUSE & (1 << 31)) // Check if BD bit is set in CAUSE register (cop0r13)
-        EPC = cpu_state.pc - 8;
-    else
-        EPC = cpu_state.pc - 4;
+    //if (CAUSE & (1 << 31)) // Check if BD bit is set in CAUSE register (cop0r13)
+    //    EPC = cpu_state.pc - 8;
+    //else
+    //    EPC = cpu_state.pc - 4;
 
     // Clear exception code bits
     CAUSE &= ~(0b11111 << 2);
     // Set the current exception code
     CAUSE |= (exception << 2);
+
+    if (cpu_state.delay_jump)
+    {
+        EPC = cpu_state.pc - 8;
+        CAUSE |= 0x80000000;
+    }
+    else
+        EPC = cpu_state.pc - 4;
 
     // Boot exception vectors in RAM/ROM
     bool bev = SR & (1 << 22);
