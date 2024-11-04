@@ -99,9 +99,6 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	//add_breakpoint(0x80068174, true, false);
-	add_breakpoint(0x80069AD0, true, false);
-
 	// Emulation loop
 	for (;;)
 	{

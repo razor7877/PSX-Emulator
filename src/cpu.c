@@ -275,6 +275,7 @@ void b_cond_z()
 
     // The condition to check for
     uint32_t condition = rt(cpu_state.current_opcode);
+    condition &= 0b10001;
 
     // The jump/branch offset
     int16_t offset_16 = cpu_state.current_opcode & 0xFFFF;
@@ -550,13 +551,11 @@ void lwl()
     int address = base_addr + offset;
     uint32_t aligned_word = read_word(address & 0xFFFFFFFC);
 
-    int shift = (address & 0x3) << 3;
+    int shift = (address & 0b11) << 3;
     uint32_t mask = 0x00FFFFFF >> shift;
     uint32_t value = (rt_val & mask) | (aligned_word << (24 - shift));
 
     R(rt(cpu_state.current_opcode)) = value;
-
-    log_warning("Unhandled instruction lwl\n");
 }
 
 void lw()
@@ -629,13 +628,11 @@ void lwr()
     int address = base_addr + offset;
     uint32_t aligned_word = read_word(address & 0xFFFFFFFC);
 
-    int shift = (address & 0x3) << 3;
+    int shift = (address & 0b11) << 3;
     uint32_t mask = 0xFFFFFF00 << (24 - shift);
     uint32_t value = (rt_val & mask) | (aligned_word >> shift);
 
     R(rt(cpu_state.current_opcode)) = value;
-
-    log_warning("Unhandled instruction lwr\n");
 }
 
 void sb()
@@ -705,8 +702,22 @@ void sh()
 
 void swl()
 {
-    debug_state.in_debug = true;
-    log_warning("Unhandled instruction swl\n");
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
+
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
+
+    int address = base_addr + offset;
+    uint32_t aligned_address = address & 0xFFFFFFFC;
+    uint32_t aligned_word = read_word(aligned_address);
+
+    int shift = (address & 0b11) << 3;
+    uint32_t mask = 0xFFFFFF00 << shift;
+    uint32_t reg_value = rt_val >> (24 - shift);
+
+    uint32_t value = (aligned_word & mask) | reg_value;
+
+    write_word(aligned_address, value);
 }
 
 void sw()
@@ -729,8 +740,22 @@ void sw()
 
 void swr()
 {
-    debug_state.in_debug = true;
-    log_warning("Unhandled instruction swr\n");
+    uint32_t base_addr = R(rs(cpu_state.current_opcode));
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
+
+    uint32_t rt_val = R(rt(cpu_state.current_opcode));
+
+    int address = base_addr + offset;
+    uint32_t aligned_address = address & 0xFFFFFFFC;
+    uint32_t aligned_word = read_word(aligned_address);
+
+    int shift = (address & 0b11) << 3;
+    uint32_t mask = 0x00FFFFFF >> (24 - shift);
+    uint32_t reg_value = rt_val << shift;
+
+    uint32_t value = (aligned_word & mask) | reg_value;
+
+    write_word(aligned_address, value);
 }
 
 void lwc0()
@@ -853,7 +878,6 @@ void syscall()
 
 void op_break()
 {
-    debug_state.in_debug = true;
     handle_exception(BP);
 }
 
@@ -904,7 +928,7 @@ void op_div()
 
     if (rt_val == 0)
     {
-        log_error("DIV instruction attempted divide by zero!\n");
+        log_warning("DIV instruction attempted divide by zero!\n");
         cpu_state.hi = 0xDEADBEEF;
         cpu_state.lo = 0xDEADBEEF;
     }
@@ -926,7 +950,7 @@ void divu()
 
     if (rt_val == 0)
     {
-        log_error("DIVU instruction attempted divide by zero!\n");
+        log_warning("DIVU instruction attempted divide by zero!\n");
         cpu_state.hi = 0xDEADBEEF;
         cpu_state.lo = 0xDEADBEEF;
     }

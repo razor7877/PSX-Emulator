@@ -136,11 +136,6 @@ void handle_exception(ExceptionType exception)
 {
     log_debug("Handling exception at PC %x\n", cpu_state.pc);
 
-    //if (CAUSE & (1 << 31)) // Check if BD bit is set in CAUSE register (cop0r13)
-    //    EPC = cpu_state.pc - 8;
-    //else
-    //    EPC = cpu_state.pc - 4;
-
     // Clear exception code bits
     CAUSE &= ~(0b11111 << 2);
     // Set the current exception code

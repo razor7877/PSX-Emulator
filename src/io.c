@@ -53,10 +53,7 @@ uint32_t read_io(uint32_t address)
 	}
 
 	if (address >= GPU_REGS_START && address < GPU_REGS_END)
-	{
-		log_warning("Unhandled GPU registers read at address %x --- PC is %x\n", address, cpu_state.pc);
 		return read_gpu(address);
-	}
 
 	if (address >= MDEC_REGS_START && address < MDEC_REGS_END)
 	{
@@ -125,7 +122,6 @@ void write_io(uint32_t address, uint32_t value)
 	}
 	else if (address >= GPU_REGS_START && address < GPU_REGS_END)
 	{
-		log_warning("Unhandled GPU registers write at address %x --- PC is %x\n", address, cpu_state.pc);
 		write_gpu(address, value);
 	}
 	else if (address >= MDEC_REGS_START && address < MDEC_REGS_END)
