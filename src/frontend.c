@@ -2,6 +2,7 @@
 
 #include "frontend.h"
 #include "logging.h"
+#include "debug.h"
 
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
@@ -34,9 +35,23 @@ void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, 
     glScissor(x_coord, y_coord, 1, 1);
     glClearColor(red / 255.0f, green / 255.0f, blue / 255.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-
     glDisable(GL_SCISSOR_TEST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    frontend_state.window_size.x = width;
+    frontend_state.window_size.y = height;
+
+    glfwSetWindowSize(window, width, height);
+    glViewport(0, 0, width, height);
+}
+
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (action == GLFW_PRESS && key == GLFW_KEY_SPACE)
+        debug_state.in_debug = !debug_state.in_debug;
 }
 
 static int setup_glfw()
@@ -59,6 +74,10 @@ static int setup_glfw()
 		return -1;
 	}
 	glfwMakeContextCurrent(frontend_state.window);
+
+    // Set callback functions for window resizing and handling input
+    glfwSetKeyCallback(frontend_state.window, key_callback);
+    glfwSetFramebufferSizeCallback(frontend_state.window, framebuffer_size_callback);
 
 	// Check if GLAD loaded successfully
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -172,35 +191,6 @@ int start_interface()
 
 int update_interface()
 {
-    /*glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glUseProgram(frontend_state.solid_shader);
-
-    GLuint VAO = 0;
-    GLuint VBO = 0;
-
-    float tri_verts[] = {
-        0.0f, 1.0f, 0.0f,
-        -1.0f, -1.0f, 0.0f,
-        1.0f, -1.0f, 0.0f
-    };
-
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(tri_verts), tri_verts, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    glDeleteVertexArrays(1, &VAO);*/
-
     // Blit from PSX framebuffer to window framebuffer
     glBindFramebuffer(GL_READ_FRAMEBUFFER, PSX_RT.framebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

@@ -412,23 +412,17 @@ void bgtz()
 
 void addi()
 {
-    uint32_t rs_val = R(rs(cpu_state.current_opcode));
+    int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
+    int32_t signed_add = (int32_t)(int16_t)(cpu_state.current_opcode & 0xFFFF);
 
-    int16_t signed_add = (int16_t)(cpu_state.current_opcode & 0xFFFF);
-    int64_t sum = (uint64_t)(rs_val + signed_add);
-
-    if (sum > 0xFFFFFFFF)
+    if (((signed_add > 0) && (rs_val > (INT32_MAX - signed_add))) ||
+        ((signed_add < 0) && (rs_val < (INT32_MIN - signed_add))))
     {
         log_warning("ADDI instruction resulted in overflow!\n");
         handle_exception(OVERFLOW);
     }
-    else if (signed_add < 0 && sum < signed_add)
-    {
-        log_warning("ADDI instruction resulted in underflow!\n");
-        handle_exception(OVERFLOW);
-    }
     else
-        R(rt(cpu_state.current_opcode)) = sum;
+        R(rt(cpu_state.current_opcode)) = rs_val + signed_add;
 }
 
 void addiu()
@@ -453,7 +447,7 @@ void sltiu()
 {
     uint32_t rs_val = R(rs(cpu_state.current_opcode));
     // Sign extend the immediate but use it as an unsigned value
-    uint32_t immediate = (int32_t)(cpu_state.current_opcode & 0xFFFF);
+    uint32_t immediate = (int32_t)(int16_t)(cpu_state.current_opcode & 0xFFFF);
 
     R(rt(cpu_state.current_opcode)) = rs_val < immediate;
 }
@@ -530,11 +524,11 @@ void lh()
 
     // Get the word that contains the byte
     uint16_t half_word_index = (address & 0b10) >> 1;
-    uint32_t word = (uint32_t)read_word(address - half_word_index * 2);
+    uint16_t word = (uint16_t)read_word(address - half_word_index * 2);
 
     // First byte in first 8 bits, second in the next 8 and so on
     uint32_t mask = 0xFFFF << (half_word_index * 16);
-    // Shift the value to bring it to an 8 bit value
+    // Shift the value to bring it to a 16 bit value
     int16_t half_word = (word & mask) >> (half_word_index * 16);
 
     int32_t sign_extended = (int32_t)half_word;
@@ -567,6 +561,12 @@ void lw()
     int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
 
     uint32_t address = base_addr + offset;
+
+    if ((address & 0b11) != 0)
+    {
+        handle_mem_exception(ADEL, address);
+        return;
+    }
 
     // Get the word
     uint32_t word = (uint32_t)read_word(address);
@@ -681,7 +681,7 @@ void sh()
         return;
     }
 
-    uint8_t value = R(rt(cpu_state.current_opcode)) & 0xFFFF;
+    uint16_t value = R(rt(cpu_state.current_opcode)) & 0xFFFF;
 
     // Where the half word is located in the word
     int half_word_index = (address & 0b10) >> 1;
@@ -864,11 +864,11 @@ void jr()
 
 void jalr()
 {
-    // Save return address in R31
-    R(rd(cpu_state.current_opcode)) = cpu_state.pc + 0x4;
-
     cpu_state.jmp_address = R(rs(cpu_state.current_opcode));
     cpu_state.delay_jump = true;
+
+    // Save return address in R31
+    R(rd(cpu_state.current_opcode)) = cpu_state.pc + 0x4;
 }
 
 void syscall()
@@ -906,15 +906,15 @@ void mult()
     int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
     int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
-    int64_t mult_result = rs_val * rt_val;
+    int64_t mult_result = (int64_t)rs_val * (int64_t)rt_val;
     cpu_state.hi =  (mult_result & 0xFFFFFFFF00000000) >> 32;
     cpu_state.lo =  mult_result & 0xFFFFFFFF;
 }
 
 void multu()
 {
-    uint32_t rs_val = R(rs(cpu_state.current_opcode));
-    uint32_t rt_val = R(rt(cpu_state.current_opcode));
+    uint64_t rs_val = R(rs(cpu_state.current_opcode));
+    uint64_t rt_val = R(rt(cpu_state.current_opcode));
 
     uint64_t mult_result = rs_val * rt_val;
     cpu_state.hi =  (mult_result & 0xFFFFFFFF00000000) >> 32;
@@ -929,8 +929,8 @@ void op_div()
     if (rt_val == 0)
     {
         log_warning("DIV instruction attempted divide by zero!\n");
-        cpu_state.hi = 0xDEADBEEF;
-        cpu_state.lo = 0xDEADBEEF;
+        cpu_state.hi = rs_val;
+        cpu_state.lo = -1;
     }
     else
     {
@@ -951,8 +951,8 @@ void divu()
     if (rt_val == 0)
     {
         log_warning("DIVU instruction attempted divide by zero!\n");
-        cpu_state.hi = 0xDEADBEEF;
-        cpu_state.lo = 0xDEADBEEF;
+        cpu_state.hi = rs_val;
+        cpu_state.lo = -1;
     }
     else
     {
@@ -967,15 +967,17 @@ void divu()
 
 void add()
 {
-    uint64_t sum = R(rs(cpu_state.current_opcode)) + R(rt(cpu_state.current_opcode));
+    int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
+    int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
-    if (sum > 0xFFFFFFFF)
+    if (((rt_val > 0) && (rs_val > (INT32_MAX - rt_val))) ||
+        ((rt_val < 0) && (rs_val < (INT32_MIN - rt_val))))
     {
         log_warning("ADD instruction resulted in overflow!\n");
         handle_exception(OVERFLOW);
     }
     else
-        R(rd(cpu_state.current_opcode)) = sum;
+        R(rd(cpu_state.current_opcode)) = rs_val + rt_val;
 }
 
 void addu()
@@ -991,15 +993,14 @@ void sub()
     int32_t rs_val = (int32_t)R(rs(cpu_state.current_opcode));
     int32_t rt_val = (int32_t)R(rt(cpu_state.current_opcode));
 
-    int64_t sub_result = rs_val - rt_val;
-
-    if (sub_result > 0xFFFFFFFF)
+    if (((rt_val > 0) && (rs_val < (INT32_MIN + rt_val))) ||
+        ((rt_val < 0) && (rs_val > (INT32_MAX + rt_val))))
     {
         log_error("SUB instruction caused overflow!\n");
         handle_exception(OVERFLOW);
     }
     else
-        R(rd(cpu_state.current_opcode)) = sub_result & 0xFFFFFFFF;
+        R(rd(cpu_state.current_opcode)) = rs_val - rt_val;
 }
 
 void subu()

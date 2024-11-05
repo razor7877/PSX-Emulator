@@ -28,6 +28,14 @@ typedef struct
 
 extern frontend frontend_state;
 
+/// <summary>
+/// Draws a pixel into the PSX internal framebuffer
+/// </summary>
+/// <param name="x_coord">The x position of the pixel</param>
+/// <param name="y_coord">The y position of the pixel</param>
+/// <param name="red">The red color value</param>
+/// <param name="green">The green color value</param>
+/// <param name="blue">The blue color value</param>
 void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, uint8_t blue);
 
 /// <summary>
