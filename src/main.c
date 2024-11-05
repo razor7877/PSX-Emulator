@@ -1,13 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "main.h"
 #include "memory.h"
-#include "logging.h"
 #include "cpu.h"
-#include "tests.h"
 #include "debug.h"
+#include "tests.h"
+#include "frontend.h"
+#include "logging.h"
 
 const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
 
@@ -99,8 +101,14 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
+	if (start_interface() != 0)
+	{
+		log_error("Couldn't start interface!\n");
+		return -1;
+	}
+
 	// Emulation loop
-	for (;;)
+	while (update_interface() == 0)
 	{
 		if (!debug_state.in_debug)
 		{
@@ -112,6 +120,8 @@ int main(int argc, char** argv)
 		else // In debug mode, query user input
 			handle_debug_input();
 	}
+
+	stop_interface();
 
 	return 0;
 }
