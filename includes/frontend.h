@@ -6,6 +6,7 @@
 typedef struct
 {
 	GLFWwindow* window;
+	GLuint solid_shader;
 } frontend;
 
 extern frontend frontend_state;

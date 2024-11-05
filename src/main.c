@@ -110,14 +110,19 @@ int main(int argc, char** argv)
 	// Emulation loop
 	while (update_interface() == 0)
 	{
-		if (!debug_state.in_debug)
+		int cycle_count = 0;
+
+		// Run emulation until we finish a frame or we encounter a breakpoint
+		while (cycle_count < NTSC_FRAME_CYCLE_COUNT && !debug_state.in_debug)
 		{
 			handle_instruction(debug_state.print_instructions);
+			cycle_count++;
 
 			if (!finished_bios_boot && cpu_state.pc == 0x80030000)
 				sideload_exe();
 		}
-		else // In debug mode, query user input
+
+		if (debug_state.in_debug) // In debug mode, query user input
 			handle_debug_input();
 	}
 

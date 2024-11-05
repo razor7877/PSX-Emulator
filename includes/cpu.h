@@ -3,6 +3,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define CPU_FREQ 33868800 // CPU Frequency in Hz
+#define NTSC_FRAME_FREQ 59.940 // Interlaced vertical refresh rate on NTSC
+#define NTSC_FRAME_CYCLE_COUNT (CPU_FREQ / NTSC_FRAME_FREQ) // How many cycles to complete one NTSC frame
+
 #define R(reg) cpu_state.registers[reg]
 #define rs(value) ((value & 0x03E00000) >> 21)
 #define rt(value) ((value & 0x001F0000) >> 16)
