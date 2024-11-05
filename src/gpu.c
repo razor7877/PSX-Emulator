@@ -1,19 +1,23 @@
 #include "gpu.h"
 #include "logging.h"
+#include "frontend.h"
 
-uint32_t gp0;
-uint32_t gp1;
-uint32_t gpu_read = 0;
-//uint32_t gpu_stat = 0x10000000;
-uint32_t gpu_stat = 0xFFFFFFFF;
+gpu gpu_state = {
+	.gpu_read = 0,
+	.gpu_stat = 0xFFFFFFFF,
+	.running_gp0_command = false,
+	.current_gp0_command = 0,
+	.rect_size = 0,
+	.rect_color = 0,
+};
 
 uint32_t read_gpu(uint32_t address)
 {
 	if (address == 0x1F801810)
-		return gpu_read;
+		return gpu_state.gpu_read;
 
 	if (address == 0x1F801814)
-		return gpu_stat;
+		return gpu_state.gpu_stat;
 
 	log_warning("Unhandled GPU register read at address %x\n", address);
 
@@ -27,35 +31,58 @@ static void handle_gp0_command(uint32_t value)
 
 	switch (command)
 	{
-		case 0b000:
-			log_warning("Received GPU misc command\n");
+		case GP0_MISC:
+			if (gpu_state.running_gp0_command && gpu_state.current_gp0_command == GP0_RECTANGLE)
+			{
+				uint8_t red = gpu_state.rect_color & 0x0000FF;
+				uint8_t green = (gpu_state.rect_color & 0x00FF00) >> 8;
+				uint8_t blue = (gpu_state.rect_color & 0xFF0000) >> 16;
+
+				uint16_t x_coord = value & 0xFFFF;
+				uint16_t y_coord = (value & 0xFFFF0000) >> 16;
+
+				if (gpu_state.rect_size == SINGLE_PIXEL)
+					draw_pixel(x_coord, y_coord, red, green, blue);
+				else
+					log_warning("Unhandled rectangle draw with size %x\n", gpu_state.rect_size);
+				//log_warning("Received rectangle vertex data - x %x y %x - RGB %x %x %x\n", x_coord, y_coord, red, green, blue);
+			}
+			else
+				log_warning("Received GPU misc command\n");
 			break;
 
-		case 0b001:
+		case GP0_POLYGON:
 			log_warning("Received GPU polygon primitive command\n");
 			break;
 
-		case 0b010:
+		case GP0_LINE:
 			log_warning("Received GPU line primitive command\n");
 			break;
 
-		case 0b011:
-			log_warning("Received GPU rectangle primitive command\n");
+		case GP0_RECTANGLE:
+			gpu_state.running_gp0_command = true;
+			gpu_state.current_gp0_command = GP0_RECTANGLE;
+
+			uint32_t size_mask = 0b11 << 27;
+			gpu_state.rect_size = (value & size_mask) >> 27;
+			gpu_state.rect_color = value & 0x00FFFFFF;
+
+			//log_warning("Received GPU rectangle primitive command - Rect size is %x\n", gpu_state.rect_size);
 			break;
 
-		case 0b100:
+		case GP0_VRAM_TO_VRAM_BLIT:
 			log_warning("Received GPU VRAM-to-VRAM blit command\n");
 			break;
 
-		case 0b101:
+		case GP0_VRAM_TO_CPU_BLIT:
 			log_warning("Received GPU CPU-to-VRAM blit command\n");
 			break;
 
-		case 0b110:
+		case GP0_CPU_TO_VRAM_BLIT:
 			log_warning("Received GPU VRAM-to-CPU blit command\n");
 			break;
 
-		case 0b111:
+		case GP0_ENVIRONMENT:
 			log_warning("Received GPU environment command\n");
 			break;
 	}
@@ -68,51 +95,52 @@ static void handle_gp1_command(uint32_t value)
 
 	switch (command)
 	{
-		case 0x0:
+		case GP1_RESET:
 			log_warning("GP1 Command: Reset GPU\n");
 			break;
 
-		case 0x1:
-			log_warning("GP1 Command: Reset command buffer\n");
+		case GP1_RESET_CMD_BUFFER:
+			gpu_state.running_gp0_command = false;
+			//log_warning("GP1 Command: Reset command buffer\n");
 			break;
 
-		case 0x2:
+		case GP1_ACK_IRQ:
 			log_warning("GP1 Command: ACK GPU IRQ\n");
 			break;
 
-		case 0x3:
+		case GP1_DISPLAY_ENABLE:
 			log_warning("GP1 Command: Display enable\n");
 			break;
 
-		case 0x4:
+		case GP1_DMA_DIRECTION:
 			log_warning("GP1 Command: DMA Direction/Data request\n");
 			break;
 
-		case 0x5:
+		case GP1_DISPLAY_START_VRAM:
 			log_warning("GP1 Command: Start of display area in VRAM\n");
 			break;
 
-		case 0x6:
+		case GP1_DISPLAY_RANGE_H:
 			log_warning("GP1 Command: Horizontal display range\n");
 			break;
 
-		case 0x7:
+		case GP1_DISPLAY_RANGE_V:
 			log_warning("GP1 Command: Vertical display range\n");
 			break;
 
-		case 0x8:
+		case GP1_DISPLAY_MODE:
 			log_warning("GP1 Command: Display mode\n");
 			break;
 
-		case 0x9:
+		case GP1_VRAM_SIZE_V2:
 			log_warning("GP1 Command: Set VRAM size (v2)\n");
 			break;
 
-		case 0x10:
+		case GP1_READ_INTERNAL_REG:
 			log_warning("GP1 Command: Read GPU internal register\n");
 			break;
 
-		case 0x20:
+		case GP1_VRAM_SIZE_V1:
 			log_warning("GP1 Command: Set VRAM size (v1)\n");
 			break;
 
@@ -130,4 +158,6 @@ void write_gpu(uint32_t address, uint32_t value)
 		handle_gp1_command(value);
 	else
 		log_warning("Unhandled GPU register write at address %x with value %x\n", address, value);
+
+	//log_warning("Unhandled GPU register write at address %x with value %x\n", address, value);
 }
