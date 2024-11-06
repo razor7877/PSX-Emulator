@@ -45,7 +45,6 @@ static void handle_gp0_command(uint32_t value)
 					draw_pixel(x_coord, y_coord, red, green, blue);
 				else
 					log_warning("Unhandled rectangle draw with size %x\n", gpu_state.rect_size);
-				//log_warning("Received rectangle vertex data - x %x y %x - RGB %x %x %x\n", x_coord, y_coord, red, green, blue);
 			}
 			else
 				log_warning("Received GPU misc command\n");

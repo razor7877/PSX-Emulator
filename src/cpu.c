@@ -295,9 +295,8 @@ void b_cond_z()
 
         case 0b10000: // BLTZAL (< 0 & link)
             if (rs_val < 0)
-            {
                 passes_check = true;
-            }
+
             is_link_condition = true;
             break;
 
@@ -308,9 +307,8 @@ void b_cond_z()
 
         case 0b10001: // BGEZAL (>= 0 & link)
             if (rs_val >= 0)
-            {
                 passes_check = true;
-            }
+
             is_link_condition = true;
             break;
 

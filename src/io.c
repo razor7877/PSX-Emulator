@@ -3,6 +3,9 @@
 #include "gpu.h"
 #include "logging.h"
 #include "interrupt.h"
+#include "dma.h"
+
+#define IGNORE_SPU_LOGS
 
 /// <summary>
 /// Reads a word from an IO port
@@ -36,13 +39,12 @@ uint32_t read_io(uint32_t address)
 
 	if (address >= DMA_REGS_START && address < DMA_REGS_END)
 	{
-		log_warning("Unhandled DMA registers read at address %x\n", address);
-		return 0;
+		return read_dma_regs(address);
 	}
 
 	if (address >= TIMERS_REGS_START && address < TIMERS_REGS_END)
 	{
-		log_warning("Unhandled DMA registers read at address %x\n", address);
+		log_warning("Unhandled timer registers read at address %x\n", address);
 		return 0xFFFFFFFF;
 	}
 
@@ -63,25 +65,33 @@ uint32_t read_io(uint32_t address)
 
 	if (address >= SPU_VOICE_START && address < SPU_VOICE_END)
 	{
+#ifndef IGNORE_SPU_LOGS
 		log_warning("Unhandled SPU voice read at address %x\n", address);
+#endif
 		return 0xFFFFFFFF;
 	}
 
 	if (address >= SPU_CTRL_REGS_START && address < SPU_CTRL_REGS_END)
 	{
+#ifndef IGNORE_SPU_LOGS
 		log_warning("Unhandled SPU control registers read at address %x\n", address);
+#endif
 		return 0;
 	}
 
 	if (address >= SPU_REVERB_START && address < SPU_REVERB_END)
 	{
+#ifndef IGNORE_SPU_LOGS
 		log_warning("Unhandled SPU reverb read at address %x\n", address);
+#endif
 		return 0xFFFFFFFF;
 	}
 
 	if (address >= SPU_INTERNAL_START && address < SPU_INTERNAL_END)
 	{
+#ifndef IGNORE_SPU_LOGS
 		log_warning("Unhandled SPU internal read at address %x\n", address);
+#endif
 		return 0xFFFFFFFF;
 	}
 
@@ -110,11 +120,11 @@ void write_io(uint32_t address, uint32_t value)
 	}
 	else if (address >= DMA_REGS_START && address < DMA_REGS_END)
 	{
-		log_warning("Unhandled DMA registers write at address %x\n", address);
+		write_dma_regs(address, value);
 	}
 	else if (address >= TIMERS_REGS_START && address < TIMERS_REGS_END)
 	{
-		log_warning("Unhandled DMA registers write at address %x\n", address);
+		log_warning("Unhandled timer registers write at address %x\n", address);
 	}
 	else if (address >= CDROM_REGS_START && address < CDROM_REGS_END)
 	{
@@ -130,19 +140,27 @@ void write_io(uint32_t address, uint32_t value)
 	}
 	else if (address >= SPU_VOICE_START && address < SPU_VOICE_END)
 	{
+#ifndef IGNORE_SPU_LOGS
 		log_warning("Unhandled SPU voice write at address %x\n", address);
+#endif
 	}
 	else if (address >= SPU_CTRL_REGS_START && address < SPU_CTRL_REGS_END)
 	{
+#ifndef IGNORE_SPU_LOGS
 		log_warning("Unhandled SPU control registers write at address %x\n", address);
+#endif
 	}
 	else if (address >= SPU_REVERB_START && address < SPU_REVERB_END)
 	{
+#ifndef IGNORE_SPU_LOGS
 		log_warning("Unhandled SPU reverb write at address %x\n", address);
+#endif
 	}
 	else if (address >= SPU_INTERNAL_START && address < SPU_INTERNAL_END)
 	{
+#ifndef IGNORE_SPU_LOGS
 		log_warning("Unhandled SPU internal write at address %x\n", address);
+#endif
 	}
 	else
 		log_warning("Unhandled IO write at address %x\n", address);
