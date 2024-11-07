@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -37,6 +39,12 @@ extern Frontend frontend_state;
 /// <param name="green">The green color value</param>
 /// <param name="blue">The blue color value</param>
 void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, uint8_t blue);
+
+/// <summary>
+/// Resizes the PSX framebuffer
+/// </summary>
+/// <param name="new_size">The new size for the PSX framebuffer</param>
+void resize_psx_framebuffer(Vec2 new_size);
 
 /// <summary>
 /// Starts the frontend

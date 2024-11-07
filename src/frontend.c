@@ -178,6 +178,23 @@ static void create_psx_framebuffer()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void resize_psx_framebuffer(Vec2 new_size)
+{
+    PSX_RT.size = new_size;
+    
+    glDeleteFramebuffers(1, &PSX_RT.framebuffer);
+    glDeleteRenderbuffers(1, &PSX_RT.depth_stencil_buffer);
+    glDeleteTextures(1, &PSX_RT.render_texture);
+
+    PSX_RT.framebuffer = 0;
+    PSX_RT.depth_stencil_buffer = 0;
+    PSX_RT.render_texture = 0;
+
+    create_psx_framebuffer();
+
+    log_debug("PSX Framebuffer was resized! New size is %f by %f\n", new_size.x, new_size.y);
+}
+
 int start_interface()
 {
 	if (setup_glfw() != 0)

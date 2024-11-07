@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #include "dma.h"
 #include "logging.h"
 
@@ -80,18 +82,19 @@ void write_dma_regs(uint32_t address, uint32_t value)
 		if (dma_register == 0)
 		{
 			dma_regs.channels[dma_channel].dma_madr = value;
-			log_debug("DMA MADR write on channel %x\n", dma_channel);
+			log_debug("DMA MADR write on channel %x -- value %x\n", dma_channel, value);
 		}
 		else if (dma_register == 4)
 		{
 			dma_regs.channels[dma_channel].dma_bcr = value;
-			log_debug("DMA BCR write on channel %x\n", dma_channel);
+			log_debug("DMA BCR write on channel %x -- value\n", dma_channel, value);
 		}
 		else if (dma_register == 8)
 		{
 			DMAChannel* channel = &dma_regs.channels[dma_channel];
 			DMATransferState* state = &channel->transfer_state;
-
+			
+			// Update the channel state depending on the value written to it
 			state->dma_direction = value & 1;
 			state->madr_increment = (value & 0b10) >> 1;
 			state->bit_8 = (value & (1 << 8)) >> 8;
@@ -101,10 +104,22 @@ void write_dma_regs(uint32_t address, uint32_t value)
 			state->start_transfer = (value & (1 << 24)) >> 24;
 			
 			channel->dma_chcr = value;
-			log_debug("DMA CHCR write on channel %x\n", dma_channel);
+			log_debug("DMA CHCR write on channel %x -- value %x\n", dma_channel, value);
 
-			log_debug("Transfer direction is %s\n", dma_direction_str[state->dma_direction]);
-			log_debug("Transfer mode is %s\n", dma_mode_str[state->transfer_mode]);
+			if (state->start_transfer)
+			{
+				log_debug("--- STARTING DMA TRANSFER ---\n");
+
+				log_debug("Transfer direction is %s\n", dma_direction_str[state->dma_direction]);
+				log_debug("Transfer mode is %s\n", dma_mode_str[state->transfer_mode]);
+
+				// Clear bit 24 to indicate that the transfer has been completed
+				channel->dma_chcr &= ~(1 << 24);
+
+				log_debug("--- ENDING DMA TRANSFER ---\n");
+			}
+			else
+				log_debug("No DMA started...\n");
 		}
 		else
 			log_warning("Unhandled DMA channels write at address %x\n", address);

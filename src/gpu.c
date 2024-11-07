@@ -9,6 +9,7 @@ GPU gpu_state = {
 	.current_gp0_command = 0,
 	.rect_size = 0,
 	.rect_color = 0,
+	.display_mode = 0,
 };
 
 uint32_t read_gpu(uint32_t address)
@@ -87,6 +88,52 @@ static void handle_gp0_command(uint32_t value)
 	}
 }
 
+static inline Vec2 get_screen_resolution(DisplayMode display_mode)
+{
+	int fbo_h_res = 0;
+	int fbo_v_res = 240;
+
+	if (display_mode.h_res_2 == H_RES_368)
+		fbo_h_res = 368;
+	else if (display_mode.h_res_1 == H_RES_256)
+		fbo_h_res = 256;
+	else if (display_mode.h_res_1 == H_RES_320)
+		fbo_h_res = 320;
+	else if (display_mode.h_res_1 == H_RES_512)
+		fbo_h_res = 512;
+	else if (display_mode.h_res_1 == H_RES_640)
+		fbo_h_res = 640;
+
+	// Vertical resolution is 240px unless v_res bit is set & vertical interlace is on
+	if (display_mode.v_res & display_mode.use_vertical_interlace)
+		fbo_v_res = 480;
+
+	Vec2 new_size = {
+		.x = fbo_h_res,
+		.y = fbo_v_res,
+	};
+
+	return new_size;
+}
+
+static void set_display_mode(uint32_t value)
+{
+	DisplayMode* display_mode = &gpu_state.display_mode;
+
+	display_mode->h_res_1 = value & 0b11;
+	display_mode->v_res = (value & (1 << 2)) >> 2;
+	display_mode->video_mode = (value & (1 << 3)) >> 3;
+	display_mode->color_depth = (value & (1 << 4)) >> 4;
+	display_mode->use_vertical_interlace = (value & (1 << 5)) >> 5;
+	display_mode->h_res_2 = (value & (1 << 6)) >> 6;
+	display_mode->flip_screen_horizontal = (value & (1 << 7)) >> 7; 
+
+	// TODO : Update GPUSTAT
+
+	Vec2 screen_size = get_screen_resolution(gpu_state.display_mode);
+	resize_psx_framebuffer(screen_size);
+}
+
 static void handle_gp1_command(uint32_t value)
 {
 	uint32_t command_mask = 0xFF000000;
@@ -129,6 +176,7 @@ static void handle_gp1_command(uint32_t value)
 
 		case GP1_DISPLAY_MODE:
 			log_warning("GP1 Command: Display mode\n");
+			set_display_mode(value);
 			break;
 
 		case GP1_VRAM_SIZE_V2:
