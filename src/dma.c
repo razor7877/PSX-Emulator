@@ -91,6 +91,7 @@ void write_dma_regs(uint32_t address, uint32_t value)
 		}
 		else if (dma_register == 8)
 		{
+			// TODO : Only some bits can be written to on channel 6 (OT)
 			DMAChannel* channel = &dma_regs.channels[dma_channel];
 			DMATransferState* state = &channel->transfer_state;
 			

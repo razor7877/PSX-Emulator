@@ -85,6 +85,10 @@ static void handle_gp0_command(uint32_t value)
 		case GP0_ENVIRONMENT:
 			log_warning("Received GPU environment command\n");
 			break;
+
+		default:
+			log_error("Unhandled GP0 command!\n");
+			break;
 	}
 }
 
@@ -116,7 +120,70 @@ static inline Vec2 get_screen_resolution(DisplayMode display_mode)
 	return new_size;
 }
 
-static void set_display_mode(uint32_t value)
+/// <summary>
+/// Updates the integer GPUSTAT register using the state in GPUStatus
+/// </summary>
+static void update_gpustat()
+{
+	GPUStatus status = gpu_state.gpu_status;
+
+	uint32_t new_stat = 0;
+
+	log_debug("Updating GPUSTAT...\n");
+
+	new_stat |= status.texture_page_x_base & 0xF;
+	new_stat |= status.texture_page_y_base_1 << 1;
+	new_stat |= status.semi_transparency << 5;
+	new_stat |= status.texture_page_colors << 7;
+	new_stat |= status.dither_24_to_15 << 9;
+	new_stat |= status.draw_to_display << 10;
+	new_stat |= status.set_mask_on_draw << 11;
+	new_stat |= status.draw_pixels << 12;
+	new_stat |= status.interlace_field << 13;
+	new_stat |= status.flip_screen_horizontal << 14;
+	new_stat |= status.texture_page_y_base_2 << 15;
+	new_stat |= status.h_res_2 << 16;
+	new_stat |= status.h_res_1 << 17;
+	new_stat |= status.v_res << 19;
+	new_stat |= status.video_mode << 20;
+	new_stat |= status.color_depth << 21;
+	new_stat |= status.use_vertical_interlace << 22;
+	new_stat |= status.display_enable << 23;
+	new_stat |= status.irq_1_on << 24;
+	new_stat |= status.dma_request << 25;
+	new_stat |= status.can_receive_cmd << 26;
+	new_stat |= status.can_receive_dma_block << 27;
+	new_stat |= status.dma_direction << 29;
+	new_stat |= status.drawing_odd_lines << 31;
+
+	log_debug("Old value is %x and new value is %x\n", gpu_state.gpu_stat, new_stat);
+	gpu_state.gpu_stat = new_stat;
+}
+
+/// <summary>
+/// Updates the GPUSTAT parameters after a GP1 display mode command
+/// </summary>
+/// <param name="display_mode">The display mode parameters</param>
+static void update_gpustat_display_mode(DisplayMode display_mode)
+{
+	GPUStatus* status = &gpu_state.gpu_status;
+
+	status->h_res_1 = display_mode.h_res_1;
+	status->h_res_2 = display_mode.h_res_2;
+	status->v_res = display_mode.v_res;
+	status->video_mode = display_mode.video_mode;
+	status->color_depth = display_mode.color_depth;
+	status->use_vertical_interlace = display_mode.use_vertical_interlace;
+	status->flip_screen_horizontal = display_mode.flip_screen_horizontal;
+
+	update_gpustat();
+}
+
+/// <summary>
+/// Executes a GP1 display mode command
+/// </summary>
+/// <param name="value">The GP1 display mode command</param>
+static void gp1_display_mode(uint32_t value)
 {
 	DisplayMode* display_mode = &gpu_state.display_mode;
 
@@ -128,7 +195,8 @@ static void set_display_mode(uint32_t value)
 	display_mode->h_res_2 = (value & (1 << 6)) >> 6;
 	display_mode->flip_screen_horizontal = (value & (1 << 7)) >> 7; 
 
-	// TODO : Update GPUSTAT
+	// Update GPUSTAT register
+	update_gpustat_display_mode(gpu_state.display_mode);
 
 	Vec2 screen_size = get_screen_resolution(gpu_state.display_mode);
 	resize_psx_framebuffer(screen_size);
@@ -143,23 +211,47 @@ static void handle_gp1_command(uint32_t value)
 	{
 		case GP1_RESET:
 			log_warning("GP1 Command: Reset GPU\n");
+			handle_gp1_command(0x01 << 24);
+			handle_gp1_command(0x02 << 24);
+			handle_gp1_command(0x03 << 24);
+			handle_gp1_command(0x04 << 24);
+			handle_gp1_command(0x05 << 24);
+			handle_gp1_command(0x06 << 24);
+			handle_gp1_command(0x07 << 24);
+			handle_gp1_command(0x08 << 24);
+
+			handle_gp0_command(0xE1 << 24);
+			handle_gp0_command(0xE2 << 24);
+			handle_gp0_command(0xE3 << 24);
+			handle_gp0_command(0xE4 << 24);
+			handle_gp0_command(0xE5 << 24);
+			handle_gp0_command(0xE6 << 24);
 			break;
 
 		case GP1_RESET_CMD_BUFFER:
+			log_debug("GP1 Command: Reset command buffer\n");
 			gpu_state.running_gp0_command = false;
-			//log_warning("GP1 Command: Reset command buffer\n");
 			break;
 
 		case GP1_ACK_IRQ:
-			log_warning("GP1 Command: ACK GPU IRQ\n");
+			log_warning("GP1 Command: ACK GPU IRQ -- old flag is %x\n", gpu_state.gpu_status.irq_1_on);
+			gpu_state.gpu_status.irq_1_on = false;
+			update_gpustat();
+			log_debug("New flag is %x\n", gpu_state.gpu_status.irq_1_on);
 			break;
 
 		case GP1_DISPLAY_ENABLE:
-			log_warning("GP1 Command: Display enable\n");
+			log_debug("GP1 Command: Display enable -- old enable is %x\n", gpu_state.gpu_status.display_enable);
+			gpu_state.gpu_status.display_enable = value & 1;
+			update_gpustat();
+			log_debug("New enable is %x\n", gpu_state.gpu_status.display_enable);
 			break;
 
 		case GP1_DMA_DIRECTION:
-			log_warning("GP1 Command: DMA Direction/Data request\n");
+			log_debug("GP1 Command: DMA Direction/Data request -- old direction is %x\n", gpu_state.gpu_status.dma_direction);
+			gpu_state.gpu_status.dma_direction = (value & 0b11) << 29;
+			update_gpustat();
+			log_debug("New direction is %x\n", gpu_state.gpu_status.dma_direction);
 			break;
 
 		case GP1_DISPLAY_START_VRAM:
@@ -175,8 +267,8 @@ static void handle_gp1_command(uint32_t value)
 			break;
 
 		case GP1_DISPLAY_MODE:
-			log_warning("GP1 Command: Display mode\n");
-			set_display_mode(value);
+			log_debug("GP1 Command: Display mode\n");
+			gp1_display_mode(value);
 			break;
 
 		case GP1_VRAM_SIZE_V2:
@@ -192,7 +284,7 @@ static void handle_gp1_command(uint32_t value)
 			break;
 
 		default:
-			log_warning("Unhandled GP1 command!\n");
+			log_error("Unhandled GP1 command!\n");
 			break;
 	}
 }

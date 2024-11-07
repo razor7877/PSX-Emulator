@@ -109,6 +109,54 @@ typedef struct
 	bool flip_screen_horizontal;
 } DisplayMode;
 
+typedef enum
+{
+	PAGE_4_BIT,
+	PAGE_8_BIT,
+	PAGE_15_BIT,
+	PAGE_RESERVED
+} TexturePageColors;
+
+typedef enum
+{
+	DMA_DIR_OFF = 0,
+	DMA_DIR_FIFO = 1,
+	DMA_DIR_CPU_TO_GP0 = 2,
+	DMA_DIR_GPUREAD_TO_CPU = 3,
+} DMADirection;
+
+/// <summary>
+/// All the parameters of the GPUSTAT registers
+/// </summary>
+typedef struct
+{
+	uint8_t texture_page_x_base;
+	bool texture_page_y_base_1;
+	uint8_t semi_transparency;
+	TexturePageColors texture_page_colors;
+	bool dither_24_to_15;
+	bool draw_to_display;
+	bool set_mask_on_draw;
+	bool draw_pixels;
+	bool interlace_field;
+	bool flip_screen_horizontal;
+	bool texture_page_y_base_2;
+	HorizontalRes1 h_res_1;
+	HorizontalRes2 h_res_2;
+	VerticalRes v_res;
+	VideoMode video_mode;
+	DisplayColorDepth color_depth;
+	bool use_vertical_interlace;
+	bool display_enable;
+	bool irq_1_on;
+	bool dma_request;
+	bool can_receive_cmd;
+	bool can_send_vram_to_cpu;
+	bool can_receive_dma_block;
+	DMADirection dma_direction;
+	bool drawing_odd_lines;
+} GPUStatus;
+
 typedef struct
 {
 	/// <summary>
@@ -120,7 +168,17 @@ typedef struct
 	/// GPU_STAT register
 	/// </summary>
 	uint32_t gpu_stat;
-	
+
+	/// <summary>
+	/// All the parameters of the GPUSTAT register
+	/// </summary>
+	GPUStatus gpu_status;
+
+	/// <summary>
+	/// Stores the state associated with the display mode GP1 command
+	/// </summary>
+	DisplayMode display_mode;
+
 	/// <summary>
 	/// Whether the GPU is currently running a GP0 command
 	/// </summary>
@@ -140,11 +198,6 @@ typedef struct
 	/// When rendering rectangles, the current rectangle color
 	/// </summary>
 	uint32_t rect_color;
-
-	/// <summary>
-	/// Stores the state associated with the display mode GP1 command
-	/// </summary>
-	DisplayMode display_mode;
 } GPU;
 
 extern GPU gpu_state;
