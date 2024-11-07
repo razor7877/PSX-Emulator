@@ -2,7 +2,7 @@
 #include "logging.h"
 #include "frontend.h"
 
-gpu gpu_state = {
+GPU gpu_state = {
 	.gpu_read = 0,
 	.gpu_stat = 0xFFFFFFFF,
 	.running_gp0_command = false,

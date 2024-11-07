@@ -7,7 +7,7 @@
 #include "logging.h"
 #include "cpu.h"
 
-debug_struct debug_state = {
+DebugState debug_state = {
 	.code_breakpoints = {0},
 	.breakpoint_count = 0,
 	.in_debug = false,
@@ -65,7 +65,7 @@ static void show_breakpoints()
 	log_info_no_prefix("Showing breakpoints:\n");
 	for (int i = 0; i < debug_state.breakpoint_count; i++)
 	{
-		breakpoint br = debug_state.code_breakpoints[i];
+		Breakpoint br = debug_state.code_breakpoints[i];
 		log_info_no_prefix("%d : %08x --- Code: %d / Data: %d\n", i, br.address, br.break_on_code, br.break_on_data);
 	}
 }
@@ -174,7 +174,7 @@ void check_code_breakpoints(uint32_t address)
 	// Check for any reached breakpoints
 	for (int i = 0; i < debug_state.breakpoint_count; i++)
 	{
-		breakpoint br = debug_state.code_breakpoints[i];
+		Breakpoint br = debug_state.code_breakpoints[i];
 
 		if (br.enabled && br.break_on_code && address == br.address)
 		{
@@ -189,7 +189,7 @@ void check_data_breakpoints(uint32_t address)
 	// Check for any reached breakpoints
 	for (int i = 0; i < debug_state.breakpoint_count; i++)
 	{
-		breakpoint br = debug_state.code_breakpoints[i];
+		Breakpoint br = debug_state.code_breakpoints[i];
 
 		if (br.enabled && br.break_on_data && address == br.address)
 		{

@@ -24,9 +24,9 @@ typedef struct
 	GLuint solid_shader;
 	RenderTarget psx_render_target;
 	Vec2 window_size;
-} frontend;
+} Frontend;
 
-extern frontend frontend_state;
+extern Frontend frontend_state;
 
 /// <summary>
 /// Draws a pixel into the PSX internal framebuffer

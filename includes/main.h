@@ -20,4 +20,4 @@ typedef struct
 	uint32_t initial_r29_r30_address;
 	int32_t initial_r29_r30_offset;
 	uint8_t a_func_placeholder[20];
-} exe_header;
+} EXEHeader;

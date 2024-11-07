@@ -14,11 +14,18 @@ typedef enum
 	DMA_TRANSFER_RESERVED = 3,
 } DMATransferMode;
 
+typedef enum
+{
+	DMA_DEVICE_TO_RAM = 0,
+	DMA_RAM_TO_DEVICE = 1,
+} DMATransferDirection;
+
 /// <summary>
 /// Represents the state of a DMA channel (CHCR settings)
 /// </summary>
 typedef struct
 {
+	DMATransferDirection dma_direction;
 	bool madr_increment;
 	bool bit_8;
 	DMATransferMode transfer_mode;
@@ -43,7 +50,7 @@ typedef struct
 /// </summary>
 typedef struct
 {
-	DMAChannel channels[6];
+	DMAChannel channels[7];
 	uint32_t dpcr;
 	uint32_t dicr;
 } DMA;

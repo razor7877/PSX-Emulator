@@ -357,7 +357,7 @@ void load_bios_into_mem(FILE* bios_file)
 	fread(&bios_rom, sizeof(uint8_t), 512 * KIB_SIZE, bios_file);
 }
 
-void sideload_exe_into_mem(exe_header file_header, FILE* exe_file)
+void sideload_exe_into_mem(EXEHeader file_header, FILE* exe_file)
 {
 	// Set the registers using the header info
 	cpu_state.pc = file_header.initial_pc;

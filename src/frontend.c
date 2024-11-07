@@ -9,7 +9,7 @@
 
 #define PSX_RT frontend_state.psx_render_target
 
-frontend frontend_state = {
+Frontend frontend_state = {
 	.window = NULL,
     .solid_shader = 0,
     .window_size = {

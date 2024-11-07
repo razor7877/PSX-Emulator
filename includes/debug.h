@@ -14,14 +14,14 @@ typedef struct
 	bool break_on_data;
 	bool break_on_code;
 	bool enabled;
-} breakpoint;
+} Breakpoint;
 
 typedef struct
 {
 	/// <summary>
 	/// Stores information about the breakpoints used by the debugger
 	/// </summary>
-	breakpoint code_breakpoints[MAX_BREAKPOINTS];
+	Breakpoint code_breakpoints[MAX_BREAKPOINTS];
 
 	/// <summary>
 	/// The number of breakpoints used
@@ -47,9 +47,9 @@ typedef struct
 	/// The current index of the earliest instruction in the CPU trace
 	/// </summary>
 	int trace_start;
-} debug_struct;
+} DebugState;
 
-extern debug_struct debug_state;
+extern DebugState debug_state;
 
 /// <summary>
 /// Queries user input for the debugger

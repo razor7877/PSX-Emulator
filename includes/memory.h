@@ -66,4 +66,4 @@ void load_bios_into_mem(FILE* bios_file);
 ///</summary>
 /// <param name="exe_file">The file stream to be loaded</param>
 /// <param name="exe_size">The size of the EXE to be loaded</param>
-void sideload_exe_into_mem(exe_header file_header, FILE* exe_file);
+void sideload_exe_into_mem(EXEHeader file_header, FILE* exe_file);

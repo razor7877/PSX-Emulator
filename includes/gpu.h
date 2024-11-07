@@ -58,9 +58,9 @@ typedef struct
 	RectangleSize rect_size;
 
 	uint32_t rect_color;
-} gpu;
+} GPU;
 
-extern gpu gpu_state;
+extern GPU gpu_state;
 
 uint32_t read_gpu(uint32_t address);
 void write_gpu(uint32_t address, uint32_t value);

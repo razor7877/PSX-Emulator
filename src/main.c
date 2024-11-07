@@ -36,7 +36,7 @@ static int load_bios(const char* path)
 	return 0;
 }
 
-static void print_exe_header(exe_header file_header)
+static void print_exe_header(EXEHeader file_header)
 {
 	log_info_no_prefix("--- SIDELOADED EXE INTO MEMORY ---\n\n");
 	log_info_no_prefix("ASCII ID: %s\n", file_header.ascii_id);
@@ -76,7 +76,7 @@ static int sideload_exe()
 		return -1;
 	}
 
-	exe_header file_header = {0};
+	EXEHeader file_header = {0};
 	fread(&file_header, sizeof(uint8_t), sizeof(file_header), exe_file);
 	rewind(exe_file);
 

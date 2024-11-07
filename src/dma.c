@@ -10,6 +10,18 @@ DMA dma_regs = {
 	.dicr = 0,
 };
 
+const char dma_mode_str[][20] = {
+	"burst",
+	"slice",
+	"linked list",
+	"reserved"
+};
+
+const char dma_direction_str[][20] = {
+	"device to ram",
+	"ram to device"
+};
+
 uint32_t read_dma_regs(uint32_t address)
 {
 	if (address >= DMA_CHANNELS_START && address < DMA_CHANNELS_END)
@@ -80,6 +92,7 @@ void write_dma_regs(uint32_t address, uint32_t value)
 			DMAChannel* channel = &dma_regs.channels[dma_channel];
 			DMATransferState* state = &channel->transfer_state;
 
+			state->dma_direction = value & 1;
 			state->madr_increment = (value & 0b10) >> 1;
 			state->bit_8 = (value & (1 << 8)) >> 8;
 			state->transfer_mode = (value & (0b11 << 9)) >> 9;
@@ -89,6 +102,9 @@ void write_dma_regs(uint32_t address, uint32_t value)
 			
 			channel->dma_chcr = value;
 			log_debug("DMA CHCR write on channel %x\n", dma_channel);
+
+			log_debug("Transfer direction is %s\n", dma_direction_str[state->dma_direction]);
+			log_debug("Transfer mode is %s\n", dma_mode_str[state->transfer_mode]);
 		}
 		else
 			log_warning("Unhandled DMA channels write at address %x\n", address);
