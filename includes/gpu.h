@@ -64,8 +64,8 @@ typedef enum
 /// </summary>
 typedef enum
 {
-	USE_H_RES_1,
-	H_RES_368,
+	USE_H_RES_1 = 0,
+	H_RES_368 = 1,
 } HorizontalRes2;
 
 /// <summary>

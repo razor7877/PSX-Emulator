@@ -104,15 +104,15 @@ void write_io(uint32_t address, uint32_t value)
 {
 	if (address >= MEM_CTRL1_START && address < MEM_CTRL1_END)
 	{
-		log_warning("Unhandled memory control 1 write at address %x\n", address);
+		log_warning("Unhandled memory control 1 write at address %x value %x\n", address, value);
 	}
 	else if (address >= PERIPHERAL_IO_START && address < PERIPHERAL_IO_END)
 	{
-		log_warning("Unhandled peripheral IO write at address %x\n", address);
+		log_warning("Unhandled peripheral IO write at address %x value %x\n", address, value);
 	}
 	else if (address >= MEM_CTRL2_START && address < MEM_CTRL2_END)
 	{
-		log_warning("Unhandled memory control 2 write at address %x\n", address);
+		log_warning("Unhandled memory control 2 write at address %x value %x\n", address, value);
 	}
 	else if (address >= INTERRUPT_CTRL_START && address < INTERRUPT_CTRL_END)
 	{
@@ -124,11 +124,11 @@ void write_io(uint32_t address, uint32_t value)
 	}
 	else if (address >= TIMERS_REGS_START && address < TIMERS_REGS_END)
 	{
-		log_warning("Unhandled timer registers write at address %x\n", address);
+		log_warning("Unhandled timer registers write at address %x value %x\n", address, value);
 	}
 	else if (address >= CDROM_REGS_START && address < CDROM_REGS_END)
 	{
-		log_warning("Unhandled CDROM registers write at address %x\n", address);
+		log_warning("Unhandled CDROM registers write at address %x value %x\n", address, value);
 	}
 	else if (address >= GPU_REGS_START && address < GPU_REGS_END)
 	{

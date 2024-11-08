@@ -25,6 +25,15 @@ uint32_t read_gpu(uint32_t address)
 	return 0xFFFFFFFF;
 }
 
+static void gp0_env(uint32_t value)
+{
+	// If the first 3 bits are on, then we have a command in the range 0xE1-0xE6
+	uint32_t env_command_mask = 0b11111 << 24;
+	uint32_t env_command = (value & env_command_mask) >> 24;
+
+	log_warning("Received GPU environment command number %x -- value is %x\n", env_command, value);
+}
+
 static void handle_gp0_command(uint32_t value)
 {
 	uint32_t command_mask = (0b111 << 29);
@@ -48,15 +57,15 @@ static void handle_gp0_command(uint32_t value)
 					log_warning("Unhandled rectangle draw with size %x\n", gpu_state.rect_size);
 			}
 			else
-				log_warning("Received GPU misc command\n");
+				log_warning("Received GPU misc command -- value is %x\n", value);
 			break;
 
 		case GP0_POLYGON:
-			log_warning("Received GPU polygon primitive command\n");
+			log_warning("Received GPU polygon primitive command -- value is %x\n", value);
 			break;
 
 		case GP0_LINE:
-			log_warning("Received GPU line primitive command\n");
+			log_warning("Received GPU line primitive command -- value is %x\n", value);
 			break;
 
 		case GP0_RECTANGLE:
@@ -71,23 +80,23 @@ static void handle_gp0_command(uint32_t value)
 			break;
 
 		case GP0_VRAM_TO_VRAM_BLIT:
-			log_warning("Received GPU VRAM-to-VRAM blit command\n");
+			log_warning("Received GPU VRAM-to-VRAM blit command -- value is %x\n", value);
 			break;
 
 		case GP0_VRAM_TO_CPU_BLIT:
-			log_warning("Received GPU CPU-to-VRAM blit command\n");
+			log_warning("Received GPU CPU-to-VRAM blit command -- value is %x\n", value);
 			break;
 
 		case GP0_CPU_TO_VRAM_BLIT:
-			log_warning("Received GPU VRAM-to-CPU blit command\n");
+			log_warning("Received GPU VRAM-to-CPU blit command -- value is %x\n", value);
 			break;
 
 		case GP0_ENVIRONMENT:
-			log_warning("Received GPU environment command\n");
+			gp0_env(value);
 			break;
 
 		default:
-			log_error("Unhandled GP0 command!\n");
+			log_error("Unhandled GP0 command! -- value is %x\n", value);
 			break;
 	}
 }
@@ -210,7 +219,7 @@ static void handle_gp1_command(uint32_t value)
 	switch (command)
 	{
 		case GP1_RESET:
-			log_warning("GP1 Command: Reset GPU\n");
+			log_debug("GP1 Command: Reset GPU\n");
 			handle_gp1_command(0x01 << 24);
 			handle_gp1_command(0x02 << 24);
 			handle_gp1_command(0x03 << 24);
@@ -234,7 +243,7 @@ static void handle_gp1_command(uint32_t value)
 			break;
 
 		case GP1_ACK_IRQ:
-			log_warning("GP1 Command: ACK GPU IRQ -- old flag is %x\n", gpu_state.gpu_status.irq_1_on);
+			log_debug("GP1 Command: ACK GPU IRQ -- old flag is %x\n", gpu_state.gpu_status.irq_1_on);
 			gpu_state.gpu_status.irq_1_on = false;
 			update_gpustat();
 			log_debug("New flag is %x\n", gpu_state.gpu_status.irq_1_on);
