@@ -32,6 +32,65 @@ static void gp0_env(uint32_t value)
 	uint32_t env_command = (value & env_command_mask) >> 24;
 
 	log_warning("Received GPU environment command number %x -- value is %x\n", env_command, value);
+
+	switch (env_command)
+	{
+		case 0xE1:
+			log_warning("GP0(0xE1) - Draw mode settings\n");
+			gpu_state.gpu_status.texture_page_x_base = value & 0b1111;
+			gpu_state.gpu_status.texture_page_y_base_1 = (value & (1 << 4)) >> 4;
+			gpu_state.gpu_status.semi_transparency = (value & (0b11 << 5)) >> 5;
+			gpu_state.gpu_status.texture_page_colors = (value & (0b11 << 7)) >> 7;
+			gpu_state.gpu_status.dither_24_to_15 = (value & (1 << 9)) >> 9;
+			gpu_state.gpu_status.draw_to_display = (value & (1 << 10)) >> 10;
+			gpu_state.gpu_status.texture_page_y_base_2 = (value & (1 << 11)) >> 11;
+			// TODO : Set textured rectangle X/Y flip from bit 12-13
+			update_gpustat();
+			break;
+
+		case 0xE2:
+			break;
+
+		case 0xE3:
+			break;
+
+		case 0xE4:
+			break;
+
+		case 0xE5:
+			break;
+
+		case 0xE6:
+			break;
+	}
+}
+
+static void gp0_misc(uint32_t value)
+{
+	if (!gpu_state.running_gp0_command)
+	{
+		log_warning("Received GPU render command bits with no command running -- value is %x\n", value);
+		return;
+	}
+
+	if (gpu_state.current_gp0_command == GP0_RECTANGLE)
+	{
+		uint8_t red = gpu_state.rect_color & 0x0000FF;
+		uint8_t green = (gpu_state.rect_color & 0x00FF00) >> 8;
+		uint8_t blue = (gpu_state.rect_color & 0xFF0000) >> 16;
+
+		uint16_t x_coord = value & 0xFFFF;
+		uint16_t y_coord = (value & 0xFFFF0000) >> 16;
+
+		if (gpu_state.rect_size == SINGLE_PIXEL)
+			draw_pixel(x_coord, y_coord, red, green, blue);
+		else
+			log_warning("Unhandled rectangle draw with size %x\n", gpu_state.rect_size);
+	}
+	else
+	{
+		log_warning("Got misc command with unhandled GP0 command!\n");
+	}
 }
 
 static void handle_gp0_command(uint32_t value)
@@ -42,22 +101,7 @@ static void handle_gp0_command(uint32_t value)
 	switch (command)
 	{
 		case GP0_MISC:
-			if (gpu_state.running_gp0_command && gpu_state.current_gp0_command == GP0_RECTANGLE)
-			{
-				uint8_t red = gpu_state.rect_color & 0x0000FF;
-				uint8_t green = (gpu_state.rect_color & 0x00FF00) >> 8;
-				uint8_t blue = (gpu_state.rect_color & 0xFF0000) >> 16;
-
-				uint16_t x_coord = value & 0xFFFF;
-				uint16_t y_coord = (value & 0xFFFF0000) >> 16;
-
-				if (gpu_state.rect_size == SINGLE_PIXEL)
-					draw_pixel(x_coord, y_coord, red, green, blue);
-				else
-					log_warning("Unhandled rectangle draw with size %x\n", gpu_state.rect_size);
-			}
-			else
-				log_warning("Received GPU misc command -- value is %x\n", value);
+			gp0_misc(value);
 			break;
 
 		case GP0_POLYGON:
@@ -160,8 +204,12 @@ static void update_gpustat()
 	new_stat |= status.display_enable << 23;
 	new_stat |= status.irq_1_on << 24;
 	new_stat |= status.dma_request << 25;
-	new_stat |= status.can_receive_cmd << 26;
-	new_stat |= status.can_receive_dma_block << 27;
+	//new_stat |= status.can_receive_cmd << 26;
+	new_stat |= (1 << 26);
+	//new_stat |= status.can_receive_dma_block << 27;
+	new_stat |= (1 << 27);
+	//new_stat |= status.can_receive_dma_block << 28;
+	new_stat |= (1 << 28);
 	new_stat |= status.dma_direction << 29;
 	new_stat |= status.drawing_odd_lines << 31;
 

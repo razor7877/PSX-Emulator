@@ -2,6 +2,7 @@
 
 #include "dma.h"
 #include "logging.h"
+#include "memory.h"
 
 #define DMA_CHANNELS_START 0x1F801080
 #define DMA_CHANNELS_END (0x1F8010E0 + 0x10)
@@ -40,14 +41,12 @@ uint32_t read_dma_regs(uint32_t address)
 			log_debug("DMA MADR read on channel %x\n", dma_channel);
 			return dma_regs.channels[dma_channel].dma_madr;
 		}
-		
-		if (dma_register == 4)
+		else if (dma_register == 4)
 		{
 			log_debug("DMA BCR read on channel %x\n", dma_channel);
 			return dma_regs.channels[dma_channel].dma_bcr;
 		}
-
-		if (dma_register == 8)
+		else if (dma_register == 8)
 		{
 			log_debug("DMA CHCR read on channel %x\n", dma_channel);
 			return dma_regs.channels[dma_channel].dma_chcr;
@@ -66,6 +65,45 @@ uint32_t read_dma_regs(uint32_t address)
 	log_warning("Unhandled DMA registers read at address %x\n", address);
 
 	return 0xFFFFFFFF;
+}
+
+static void handle_dma_transfer(DMAChannel* channel)
+{
+	DMATransferState* state = &channel->transfer_state;
+
+	if (state->transfer_mode == DMA_TRANSFER_LINKED_LIST && state->dma_direction == DMA_RAM_TO_DEVICE)
+	{
+		// The address of the first node
+		uint32_t address = channel->dma_madr;
+		// Get the first linked list node
+		uint32_t ll_start = read_word(address);
+
+		log_debug("Going through linked list starting at %x\n", ll_start);
+
+		while (true)
+		{
+			
+			// Get number of words from the 8 highest bits
+			uint32_t words_to_transfer = (ll_start & 0xFF000000) >> 24;
+			log_debug("%d words to transfer for this node\n", words_to_transfer);
+
+			while (words_to_transfer--)
+			{
+				int increment = channel->transfer_state.madr_increment ? -4 : 4;
+				address += increment;
+
+				write_word(0x1F801810, read_word(address));
+			}
+
+			// Finish transfer if we have an end address
+			if (address & 0x1FFFFC)
+				break;
+
+			address = ll_start & 0xFFFFFF;
+			// The address is mapped into RAM
+			ll_start = read_word(address);
+		}
+	}
 }
 
 void write_dma_regs(uint32_t address, uint32_t value)
@@ -113,6 +151,8 @@ void write_dma_regs(uint32_t address, uint32_t value)
 
 				log_debug("Transfer direction is %s\n", dma_direction_str[state->dma_direction]);
 				log_debug("Transfer mode is %s\n", dma_mode_str[state->transfer_mode]);
+
+				handle_dma_transfer(channel);
 
 				// Clear bit 24 to indicate that the transfer has been completed
 				channel->dma_chcr &= ~(1 << 24);

@@ -4,6 +4,7 @@
 #include "logging.h"
 #include "interrupt.h"
 #include "dma.h"
+#include "timer.h"
 
 #define IGNORE_SPU_LOGS
 
@@ -33,20 +34,13 @@ uint32_t read_io(uint32_t address)
 	}
 
 	if (address >= INTERRUPT_CTRL_START && address < INTERRUPT_CTRL_END)
-	{
 		return read_interrupt_control(address);
-	}
 
 	if (address >= DMA_REGS_START && address < DMA_REGS_END)
-	{
 		return read_dma_regs(address);
-	}
 
 	if (address >= TIMERS_REGS_START && address < TIMERS_REGS_END)
-	{
-		log_warning("Unhandled timer registers read at address %x\n", address);
-		return 0xFFFFFFFF;
-	}
+		return read_timer(address);
 
 	if (address >= CDROM_REGS_START && address < CDROM_REGS_END)
 	{
@@ -124,7 +118,7 @@ void write_io(uint32_t address, uint32_t value)
 	}
 	else if (address >= TIMERS_REGS_START && address < TIMERS_REGS_END)
 	{
-		log_warning("Unhandled timer registers write at address %x value %x\n", address, value);
+		write_timer(address, value);
 	}
 	else if (address >= CDROM_REGS_START && address < CDROM_REGS_END)
 	{

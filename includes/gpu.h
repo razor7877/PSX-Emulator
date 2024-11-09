@@ -215,3 +215,5 @@ uint32_t read_gpu(uint32_t address);
 /// <param name="address">The address to be written to</param>
 /// <param name="value">The value to write to the address</param>
 void write_gpu(uint32_t address, uint32_t value);
+
+static void update_gpustat();
