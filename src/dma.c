@@ -37,20 +37,11 @@ uint32_t read_dma_regs(uint32_t address)
 		uint8_t dma_register = address & 0xF;
 
 		if (dma_register == 0)
-		{
-			log_debug("DMA MADR read on channel %x\n", dma_channel);
 			return dma_regs.channels[dma_channel].dma_madr;
-		}
 		else if (dma_register == 4)
-		{
-			log_debug("DMA BCR read on channel %x\n", dma_channel);
 			return dma_regs.channels[dma_channel].dma_bcr;
-		}
 		else if (dma_register == 8)
-		{
-			log_debug("DMA CHCR read on channel %x\n", dma_channel);
 			return dma_regs.channels[dma_channel].dma_chcr;
-		}
 
 		log_warning("Unhandled DMA channels read at address %x -- channel %x\n", address, dma_channel);
 		return 0xFFFFFFFF;
@@ -71,18 +62,21 @@ static void handle_dma_transfer(DMAChannel* channel)
 {
 	DMATransferState* state = &channel->transfer_state;
 
+	// Channel 2 linked list transfer
 	if (state->transfer_mode == DMA_TRANSFER_LINKED_LIST && state->dma_direction == DMA_RAM_TO_DEVICE)
 	{
 		// The address of the first node
 		uint32_t address = channel->dma_madr;
+
+		log_debug("Going through linked list\n");
+
 		// Get the first linked list node
-		uint32_t ll_start = read_word(address);
+		uint32_t ll_start = 0;
 
-		log_debug("Going through linked list starting at %x\n", ll_start);
-
-		while (true)
+		while ((address & 0xFFFFFF) != 0xFFFFFF)
 		{
-			
+			ll_start = read_word(address);
+
 			// Get number of words from the 8 highest bits
 			uint32_t words_to_transfer = (ll_start & 0xFF000000) >> 24;
 			log_debug("%d words to transfer for this node\n", words_to_transfer);
@@ -94,16 +88,37 @@ static void handle_dma_transfer(DMAChannel* channel)
 
 				write_word(0x1F801810, read_word(address));
 			}
+			
+			address = ll_start & 0xFFFFFF;
 
 			// Finish transfer if we have an end address
-			if (address & 0x1FFFFC)
+			if ((address & 0xFFFFFF) == 0xFFFFFF)
 				break;
 
-			address = ll_start & 0xFFFFFF;
 			// The address is mapped into RAM
 			ll_start = read_word(address);
 		}
 	}
+	else if (state->transfer_mode == DMA_TRANSFER_BURST && state->dma_direction == DMA_DEVICE_TO_RAM)
+	{
+		uint32_t address = channel->dma_madr;
+
+		// Write end node at the first address
+		write_word(address, 0x00FFFFFF);
+
+		// Then for all the other addresses, create pointer to the previous entry
+		while (channel->dma_bcr--)
+		{
+			uint32_t previous_address = address;
+
+			int increment = state->madr_increment ? -4 : 4;
+			address += increment;
+
+			write_word(address, previous_address & 0xFFFFFF);
+		}
+	}
+	else
+		log_info("UNHANDLED DMA TRANSFER\n");
 }
 
 void write_dma_regs(uint32_t address, uint32_t value)

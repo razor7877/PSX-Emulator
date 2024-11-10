@@ -39,6 +39,93 @@ void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void draw_triangle(Triangle triangle)
+{
+    // Prepare vertices for OpenGL
+    float vertices[] = {
+        (triangle.v1.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
+        (triangle.v1.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        0.0f,
+        (triangle.v2.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
+        (triangle.v2.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        0.0f,
+        (triangle.v3.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
+        (triangle.v3.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        0.0f
+    };
+
+    glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
+    glUseProgram(frontend_state.solid_shader);
+
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+
+    glBindVertexArray(vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    glDeleteVertexArrays(1, &vao);
+    glDeleteBuffers(1, &vbo);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void draw_quad(Quad quad)
+{
+    // Prepare vertices for OpenGL
+    float vertices[] = {
+        (quad.v1.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
+        (quad.v1.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        0.0f,
+        (quad.v2.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
+        (quad.v2.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        0.0f,
+        (quad.v3.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
+        (quad.v3.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        0.0f,
+        (quad.v2.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
+        (quad.v2.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        0.0f,
+        (quad.v3.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
+        (quad.v3.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        0.0f,
+        (quad.v4.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
+        (quad.v4.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        0.0f
+    };
+
+    glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
+    glUseProgram(frontend_state.solid_shader);
+
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+
+    glBindVertexArray(vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glDeleteVertexArrays(1, &vao);
+    glDeleteBuffers(1, &vbo);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     frontend_state.window_size.x = width;
@@ -202,12 +289,29 @@ int start_interface()
 
     compile_shaders();
     create_psx_framebuffer();
-
+    
 	return 0;
 }
 
 int update_interface()
 {
+    //Triangle tri = {
+    //    .v1 = { 0.0f, 0.0f, 0.0f },
+    //    .v2 = { 240.0f, 0.0f, 0.0f },
+    //    .v3 = { 240.0f, 240.0f, 0.0f },
+    //};
+
+    //draw_triangle(tri);
+
+    /*Quad quad = {
+        .v1 = { 0.0f, 0.0f, 0.0f },
+        .v2 = { 200.0f, 0.0f, 0.0f },
+        .v3 = { 0.0f, 200.0f, 0.0f },
+        .v4 = { 200.0f, 200.0f, 0.0f },
+    };
+
+    draw_quad(quad);*/
+
     // Blit from PSX framebuffer to window framebuffer
     glBindFramebuffer(GL_READ_FRAMEBUFFER, PSX_RT.framebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

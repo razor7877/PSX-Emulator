@@ -108,6 +108,7 @@ static void finish_gp0_command()
 {
 	gpu_state.current_gp0_command = 0;
 	gpu_state.running_gp0_command = false;
+	gpu_state.command_buffer_index = 0;
 
 	memset(gpu_state.command_buffer, 0, sizeof(gpu_state.command_buffer));
 }
@@ -140,27 +141,106 @@ static void gp0_misc(uint32_t value)
 	}
 	else if (gpu_state.current_gp0_command == GP0_CPU_TO_VRAM_BLIT)
 	{
-		if (gpu_state.command_buffer_index < 3)
+		if (gpu_state.command_buffer_index < 4)
 		{
 			log_info("Received parameter for CPU to VRAM blit command index %d\n", gpu_state.command_buffer_index);
 			gpu_state.command_buffer[gpu_state.command_buffer_index] = value;
 			gpu_state.command_buffer_index++;
 		}
 		
-		if (gpu_state.command_buffer_index == 3)
+		if (gpu_state.command_buffer_index == 4)
 		{
-			uint16_t x_pos = gpu_state.command_buffer[1] & 0xFFFF;
-			uint16_t y_pos = (gpu_state.command_buffer[1] & 0xFFFF0000) >> 16;
+			uint16_t x_pos = gpu_state.command_buffer[2] & 0xFFFF;
+			uint16_t y_pos = (gpu_state.command_buffer[2] & 0xFFFF0000) >> 16;
 
-			uint16_t x_size = gpu_state.command_buffer[2] & 0xFFFF;
-			uint16_t y_size = (gpu_state.command_buffer[2] & 0xFFFF0000) >> 16;
+			uint16_t x_size = gpu_state.command_buffer[3] & 0xFFFF;
+			uint16_t y_size = (gpu_state.command_buffer[3] & 0xFFFF0000) >> 16;
 
-			log_info("Finishing CPU to VRAM blit command -- dest is %x %x -- size is %x %x",
+			log_info("Finishing CPU to VRAM blit command -- dest is %x %x -- size is %x %x\n",
 				x_pos, y_pos,
 				x_size, y_size
 			);
 
 			finish_gp0_command();
+		}
+	}
+	else if (gpu_state.current_gp0_command == GP0_POLYGON)
+	{
+		uint32_t command_value = gpu_state.command_buffer[0];
+
+		// Gouraud or flat shading
+		bool is_gouraud_shading = (command_value & (1 << 28)) >> 28;
+		// Triangle or rectangle primitive
+		bool is_rectangle = (command_value & (1 << 27)) >> 27;
+		// Textured/untextured
+		bool is_textured = (command_value & (1 << 26)) >> 26;
+		// Semi transparent or opaque
+		bool is_semi_transparent = (command_value & (1 << 25)) >> 25;
+		// Raw texture or modulation
+		bool use_raw_texture = (command_value & (1 << 24)) >> 24;
+
+		int vertices = is_rectangle ? 4 : 3;
+		int vertex_word_size = 1;
+
+		if (is_gouraud_shading)
+			vertex_word_size++;
+		if (is_textured)
+			vertex_word_size++;
+
+		// The polygon command will take up to 12 words + 1 for the command itself
+		int total_cmd_size = vertices * vertex_word_size + 1;
+
+		log_warning("Received polygon primitive parameter index %x\n", gpu_state.command_buffer_index);
+		gpu_state.command_buffer[gpu_state.command_buffer_index] = value;
+		gpu_state.command_buffer_index++;
+
+		if (gpu_state.command_buffer_index >= total_cmd_size)
+		{
+			if (!is_rectangle)
+			{
+				float vertices[6] = {0};
+
+				for (int i = 0; i < 3; i++)
+				{
+					// Multiply by vertex_word_size to get the correct stride
+					uint32_t xy_pos = gpu_state.command_buffer[i * vertex_word_size + 1];
+					vertices[i * 2] = xy_pos & 0xFFFF;
+					vertices[i * 2 + 1] = (xy_pos & 0xFFFF0000) >> 0xFFFF ;
+				}
+
+				Triangle triangle = {
+					.v1 = { vertices[0], vertices[1], 0.0f },
+					.v2 = { vertices[2], vertices[3], 0.0f },
+					.v3 = { vertices[4], vertices[5], 0.0f },
+				};
+
+				draw_triangle(triangle);
+				finish_gp0_command();
+			}
+			else
+			{
+				float vertices[8] = { 0 };
+
+				for (int i = 0; i < 4; i++)
+				{
+					// Multiply by vertex_word_size to get the correct stride
+					uint32_t xy_pos = gpu_state.command_buffer[i * vertex_word_size + 1];
+					vertices[i * 2] = xy_pos & 0xFFFF;
+					vertices[i * 2 + 1] = (xy_pos & 0xFFFF0000) >> 16;
+				}
+
+				Quad quad = {
+					.v1 = { vertices[0], vertices[1], 0.0f },
+					.v2 = { vertices[2], vertices[3], 0.0f },
+					.v3 = { vertices[4], vertices[5], 0.0f },
+					.v4 = { vertices[6], vertices[7], 0.0f },
+				};
+
+				draw_quad(quad);
+				finish_gp0_command();
+			}
+
+			log_warning("Finished polygon GP0 command\n");
 		}
 	}
 	else
@@ -174,10 +254,9 @@ static void start_gp0_command(uint32_t value, GP0Command command)
 	gpu_state.current_gp0_command = command;
 	gpu_state.running_gp0_command = true;
 
-	gpu_state.command_buffer_index = 0;
-	gpu_state.command_buffer[0] = value;
-
 	memset(gpu_state.command_buffer, 0, sizeof(gpu_state.command_buffer));
+	gpu_state.command_buffer[0] = value;
+	gpu_state.command_buffer_index = 1;
 }
 
 static void handle_gp0_command(uint32_t value)
@@ -192,7 +271,7 @@ static void handle_gp0_command(uint32_t value)
 			break;
 
 		case GP0_POLYGON:
-			log_warning("Received GPU polygon primitive command -- value is %x\n", value);
+			start_gp0_command(value, GP0_POLYGON);
 			break;
 
 		case GP0_LINE:

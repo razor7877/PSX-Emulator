@@ -13,6 +13,46 @@ typedef struct
 
 typedef struct
 {
+	union
+	{
+		float x;
+		float r;
+	};
+	union
+	{
+		float y;
+		float g;
+	};
+	union
+	{
+		float z;
+		float b;
+	};
+} Vec3;
+
+typedef struct
+{
+	Vec2 position;
+	Vec3 color;
+} Vertex;
+
+typedef struct
+{
+	Vertex v1;
+	Vertex v2;
+	Vertex v3;
+} Triangle;
+
+typedef struct
+{
+	Vertex v1;
+	Vertex v2;
+	Vertex v3;
+	Vertex v4;
+} Quad;
+
+typedef struct
+{
 	GLuint framebuffer;
 	GLuint depth_stencil_buffer;
 	GLuint render_texture;
@@ -39,6 +79,10 @@ extern Frontend frontend_state;
 /// <param name="green">The green color value</param>
 /// <param name="blue">The blue color value</param>
 void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, uint8_t blue);
+
+void draw_triangle(Triangle triangle);
+
+void draw_quad(Quad quad);
 
 /// <summary>
 /// Resizes the PSX framebuffer

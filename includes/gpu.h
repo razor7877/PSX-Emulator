@@ -199,7 +199,7 @@ typedef struct
 	/// <summary>
 	/// Stores the word for the command being executed
 	/// </summary>
-	uint32_t command_buffer[12];
+	uint32_t command_buffer[13];
 
 	Vec2 texture_window_mask;
 	Vec2 texture_window_offset;
