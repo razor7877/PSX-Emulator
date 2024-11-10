@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "frontend.h"
+
 /// <summary>
 /// The possible GP0 commands
 /// </summary>
@@ -13,8 +15,8 @@ typedef enum
 	GP0_LINE = 2,
 	GP0_RECTANGLE = 3,
 	GP0_VRAM_TO_VRAM_BLIT = 4,
-	GP0_VRAM_TO_CPU_BLIT = 5,
-	GP0_CPU_TO_VRAM_BLIT = 6,
+	GP0_CPU_TO_VRAM_BLIT = 5,
+	GP0_VRAM_TO_CPU_BLIT = 6,
 	GP0_ENVIRONMENT = 7,
 } GP0Command;
 
@@ -190,14 +192,24 @@ typedef struct
 	GP0Command current_gp0_command;
 
 	/// <summary>
-	/// When rendering rectangles, the current rectangle size
+	/// The index of the last index in the command buffer
 	/// </summary>
-	RectangleSize rect_size;
+	int command_buffer_index;
 
 	/// <summary>
-	/// When rendering rectangles, the current rectangle color
+	/// Stores the word for the command being executed
 	/// </summary>
-	uint32_t rect_color;
+	uint32_t command_buffer[12];
+
+	Vec2 texture_window_mask;
+	Vec2 texture_window_offset;
+
+	Vec2 drawing_area_top_left;
+	Vec2 drawing_area_bottom_right;
+	Vec2 drawing_area_offset;
+
+	bool set_mask_while_drawing;
+	bool check_mask_before_draw;
 } GPU;
 
 extern GPU gpu_state;

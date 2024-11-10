@@ -1,15 +1,23 @@
+#include <string.h>
+
 #include "gpu.h"
 #include "logging.h"
-#include "frontend.h"
 
 GPU gpu_state = {
 	.gpu_read = 0,
 	.gpu_stat = 0xFFFFFFFF,
+	.gpu_status = {0},
+	.display_mode = 0,
 	.running_gp0_command = false,
 	.current_gp0_command = 0,
-	.rect_size = 0,
-	.rect_color = 0,
-	.display_mode = 0,
+	.command_buffer = {0},
+	.texture_window_mask = {0},
+	.texture_window_offset = {0},
+	.drawing_area_top_left = {0},
+	.drawing_area_bottom_right = {0},
+	.drawing_area_offset = {0},
+	.set_mask_while_drawing = false,
+	.check_mask_before_draw = false,
 };
 
 uint32_t read_gpu(uint32_t address)
@@ -31,12 +39,10 @@ static void gp0_env(uint32_t value)
 	uint32_t env_command_mask = 0b11111 << 24;
 	uint32_t env_command = (value & env_command_mask) >> 24;
 
-	log_warning("Received GPU environment command number %x -- value is %x\n", env_command, value);
-
 	switch (env_command)
 	{
-		case 0xE1:
-			log_warning("GP0(0xE1) - Draw mode settings\n");
+		case 0x01:
+			log_debug("GP0(0xE1) - Draw mode settings\n");
 			gpu_state.gpu_status.texture_page_x_base = value & 0b1111;
 			gpu_state.gpu_status.texture_page_y_base_1 = (value & (1 << 4)) >> 4;
 			gpu_state.gpu_status.semi_transparency = (value & (0b11 << 5)) >> 5;
@@ -48,21 +54,62 @@ static void gp0_env(uint32_t value)
 			update_gpustat();
 			break;
 
-		case 0xE2:
+		case 0x02:
+			gpu_state.texture_window_mask.x = value & 0b11111;
+			gpu_state.texture_window_mask.y = (value & (0b11111 << 5)) >> 5;
+
+			gpu_state.texture_window_offset.x = (value & (0b11111 << 10)) >> 10;
+			gpu_state.texture_window_offset.y = (value & (0b11111 << 15)) >> 15;
 			break;
 
-		case 0xE3:
+		case 0x03:
+			// Bottom right x value from lowest 10 bits
+			gpu_state.drawing_area_top_left.x = value & 0x3FF;
+			// Bottom right y value from bits 10-19
+			gpu_state.drawing_area_top_left.y = (value & (0x3FF << 10)) >> 10;
 			break;
 
-		case 0xE4:
+		case 0x04:
+			// Bottom right x value from lowest 10 bits
+			gpu_state.drawing_area_bottom_right.x = value & 0x3FF;
+			// Bottom right y value from bits 10-19
+			gpu_state.drawing_area_bottom_right.y = (value & (0x3FF << 10)) >> 10;
 			break;
 
-		case 0xE5:
+		case 0x05:
+		{
+			// x signed value from lowest 11 bits
+			uint16_t x_value = value & 0x7FF;
+			if (x_value & (1 << 10))
+				x_value |= (0b11111 << 11);
+
+			// y signed value from next 11 bits
+			uint16_t y_value = (value & (0x7FF << 11)) >> 11;
+			if (y_value & (1 << 10))
+				y_value |= (0b11111 << 11);
+
+			gpu_state.drawing_area_offset.x = (int16_t)x_value;
+			gpu_state.drawing_area_offset.y = (int16_t)y_value;
+			break;
+		}
+
+		case 0x06:
+			gpu_state.set_mask_while_drawing = value & 0b1;
+			gpu_state.check_mask_before_draw = (value & 0b10) >> 1;
 			break;
 
-		case 0xE6:
+		default:
+			log_error("Received unhandled GP0 environment command! Value is %x\n", value);
 			break;
 	}
+}
+
+static void finish_gp0_command()
+{
+	gpu_state.current_gp0_command = 0;
+	gpu_state.running_gp0_command = false;
+
+	memset(gpu_state.command_buffer, 0, sizeof(gpu_state.command_buffer));
 }
 
 static void gp0_misc(uint32_t value)
@@ -75,22 +122,62 @@ static void gp0_misc(uint32_t value)
 
 	if (gpu_state.current_gp0_command == GP0_RECTANGLE)
 	{
-		uint8_t red = gpu_state.rect_color & 0x0000FF;
-		uint8_t green = (gpu_state.rect_color & 0x00FF00) >> 8;
-		uint8_t blue = (gpu_state.rect_color & 0xFF0000) >> 16;
+		uint32_t size_mask = 0b11 << 27;
+		uint32_t rect_size = (gpu_state.command_buffer[0] & size_mask) >> 27;
+		uint32_t rect_color = gpu_state.command_buffer[0] & 0x00FFFFFF;
+
+		uint8_t red = rect_color & 0x0000FF;
+		uint8_t green = (rect_color & 0x00FF00) >> 8;
+		uint8_t blue = (rect_color & 0xFF0000) >> 16;
 
 		uint16_t x_coord = value & 0xFFFF;
 		uint16_t y_coord = (value & 0xFFFF0000) >> 16;
 
-		if (gpu_state.rect_size == SINGLE_PIXEL)
+		if (rect_size == SINGLE_PIXEL)
 			draw_pixel(x_coord, y_coord, red, green, blue);
 		else
-			log_warning("Unhandled rectangle draw with size %x\n", gpu_state.rect_size);
+			log_warning("Unhandled rectangle draw with size %x\n", rect_size);
+	}
+	else if (gpu_state.current_gp0_command == GP0_CPU_TO_VRAM_BLIT)
+	{
+		if (gpu_state.command_buffer_index < 3)
+		{
+			log_info("Received parameter for CPU to VRAM blit command index %d\n", gpu_state.command_buffer_index);
+			gpu_state.command_buffer[gpu_state.command_buffer_index] = value;
+			gpu_state.command_buffer_index++;
+		}
+		
+		if (gpu_state.command_buffer_index == 3)
+		{
+			uint16_t x_pos = gpu_state.command_buffer[1] & 0xFFFF;
+			uint16_t y_pos = (gpu_state.command_buffer[1] & 0xFFFF0000) >> 16;
+
+			uint16_t x_size = gpu_state.command_buffer[2] & 0xFFFF;
+			uint16_t y_size = (gpu_state.command_buffer[2] & 0xFFFF0000) >> 16;
+
+			log_info("Finishing CPU to VRAM blit command -- dest is %x %x -- size is %x %x",
+				x_pos, y_pos,
+				x_size, y_size
+			);
+
+			finish_gp0_command();
+		}
 	}
 	else
 	{
 		log_warning("Got misc command with unhandled GP0 command!\n");
 	}
+}
+
+static void start_gp0_command(uint32_t value, GP0Command command)
+{
+	gpu_state.current_gp0_command = command;
+	gpu_state.running_gp0_command = true;
+
+	gpu_state.command_buffer_index = 0;
+	gpu_state.command_buffer[0] = value;
+
+	memset(gpu_state.command_buffer, 0, sizeof(gpu_state.command_buffer));
 }
 
 static void handle_gp0_command(uint32_t value)
@@ -113,25 +200,18 @@ static void handle_gp0_command(uint32_t value)
 			break;
 
 		case GP0_RECTANGLE:
-			gpu_state.running_gp0_command = true;
-			gpu_state.current_gp0_command = GP0_RECTANGLE;
-
-			uint32_t size_mask = 0b11 << 27;
-			gpu_state.rect_size = (value & size_mask) >> 27;
-			gpu_state.rect_color = value & 0x00FFFFFF;
-
-			//log_warning("Received GPU rectangle primitive command - Rect size is %x\n", gpu_state.rect_size);
+			start_gp0_command(value, GP0_RECTANGLE);
 			break;
 
 		case GP0_VRAM_TO_VRAM_BLIT:
 			log_warning("Received GPU VRAM-to-VRAM blit command -- value is %x\n", value);
 			break;
 
-		case GP0_VRAM_TO_CPU_BLIT:
-			log_warning("Received GPU CPU-to-VRAM blit command -- value is %x\n", value);
+		case GP0_CPU_TO_VRAM_BLIT:
+			start_gp0_command(value, GP0_CPU_TO_VRAM_BLIT);
 			break;
 
-		case GP0_CPU_TO_VRAM_BLIT:
+		case GP0_VRAM_TO_CPU_BLIT:
 			log_warning("Received GPU VRAM-to-CPU blit command -- value is %x\n", value);
 			break;
 
@@ -286,29 +366,22 @@ static void handle_gp1_command(uint32_t value)
 			break;
 
 		case GP1_RESET_CMD_BUFFER:
-			log_debug("GP1 Command: Reset command buffer\n");
-			gpu_state.running_gp0_command = false;
+			finish_gp0_command();
 			break;
 
 		case GP1_ACK_IRQ:
-			log_debug("GP1 Command: ACK GPU IRQ -- old flag is %x\n", gpu_state.gpu_status.irq_1_on);
 			gpu_state.gpu_status.irq_1_on = false;
 			update_gpustat();
-			log_debug("New flag is %x\n", gpu_state.gpu_status.irq_1_on);
 			break;
 
 		case GP1_DISPLAY_ENABLE:
-			log_debug("GP1 Command: Display enable -- old enable is %x\n", gpu_state.gpu_status.display_enable);
 			gpu_state.gpu_status.display_enable = value & 1;
 			update_gpustat();
-			log_debug("New enable is %x\n", gpu_state.gpu_status.display_enable);
 			break;
 
 		case GP1_DMA_DIRECTION:
-			log_debug("GP1 Command: DMA Direction/Data request -- old direction is %x\n", gpu_state.gpu_status.dma_direction);
 			gpu_state.gpu_status.dma_direction = (value & 0b11) << 29;
 			update_gpustat();
-			log_debug("New direction is %x\n", gpu_state.gpu_status.dma_direction);
 			break;
 
 		case GP1_DISPLAY_START_VRAM:
