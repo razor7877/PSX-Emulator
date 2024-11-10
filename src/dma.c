@@ -68,8 +68,6 @@ static void handle_dma_transfer(DMAChannel* channel)
 		// The address of the first node
 		uint32_t address = channel->dma_madr;
 
-		log_debug("Going through linked list\n");
-
 		// Get the first linked list node
 		uint32_t ll_start = 0;
 
@@ -79,7 +77,6 @@ static void handle_dma_transfer(DMAChannel* channel)
 
 			// Get number of words from the 8 highest bits
 			uint32_t words_to_transfer = (ll_start & 0xFF000000) >> 24;
-			log_debug("%d words to transfer for this node\n", words_to_transfer);
 
 			while (words_to_transfer--)
 			{
@@ -133,15 +130,9 @@ void write_dma_regs(uint32_t address, uint32_t value)
 		uint8_t dma_register = address & 0xF;
 
 		if (dma_register == 0)
-		{
 			dma_regs.channels[dma_channel].dma_madr = value;
-			log_debug("DMA MADR write on channel %x -- value %x\n", dma_channel, value);
-		}
 		else if (dma_register == 4)
-		{
 			dma_regs.channels[dma_channel].dma_bcr = value;
-			log_debug("DMA BCR write on channel %x -- value\n", dma_channel, value);
-		}
 		else if (dma_register == 8)
 		{
 			// TODO : Only some bits can be written to on channel 6 (OT)
@@ -158,21 +149,12 @@ void write_dma_regs(uint32_t address, uint32_t value)
 			state->start_transfer = (value & (1 << 24)) >> 24;
 			
 			channel->dma_chcr = value;
-			log_debug("DMA CHCR write on channel %x -- value %x\n", dma_channel, value);
 
 			if (state->start_transfer)
 			{
-				log_debug("--- STARTING DMA TRANSFER ---\n");
-
-				log_debug("Transfer direction is %s\n", dma_direction_str[state->dma_direction]);
-				log_debug("Transfer mode is %s\n", dma_mode_str[state->transfer_mode]);
-
 				handle_dma_transfer(channel);
-
 				// Clear bit 24 to indicate that the transfer has been completed
 				channel->dma_chcr &= ~(1 << 24);
-
-				log_debug("--- ENDING DMA TRANSFER ---\n");
 			}
 			else
 				log_debug("No DMA started...\n");

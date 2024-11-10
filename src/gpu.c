@@ -141,14 +141,11 @@ static void gp0_misc(uint32_t value)
 	}
 	else if (gpu_state.current_gp0_command == GP0_CPU_TO_VRAM_BLIT)
 	{
-		if (gpu_state.command_buffer_index < 4)
-		{
-			log_info("Received parameter for CPU to VRAM blit command index %d\n", gpu_state.command_buffer_index);
-			gpu_state.command_buffer[gpu_state.command_buffer_index] = value;
-			gpu_state.command_buffer_index++;
-		}
+		log_info("Received parameter for CPU to VRAM blit command index %d\n", gpu_state.command_buffer_index);
+		gpu_state.command_buffer[gpu_state.command_buffer_index] = value;
+		gpu_state.command_buffer_index++;
 		
-		if (gpu_state.command_buffer_index == 4)
+		if (gpu_state.command_buffer_index >= 4)
 		{
 			uint16_t x_pos = gpu_state.command_buffer[2] & 0xFFFF;
 			uint16_t y_pos = (gpu_state.command_buffer[2] & 0xFFFF0000) >> 16;
@@ -190,7 +187,6 @@ static void gp0_misc(uint32_t value)
 		// The polygon command will take up to 12 words + 1 for the command itself
 		int total_cmd_size = vertices * vertex_word_size + 1;
 
-		log_warning("Received polygon primitive parameter index %x\n", gpu_state.command_buffer_index);
 		gpu_state.command_buffer[gpu_state.command_buffer_index] = value;
 		gpu_state.command_buffer_index++;
 
@@ -209,9 +205,9 @@ static void gp0_misc(uint32_t value)
 				}
 
 				Triangle triangle = {
-					.v1 = { vertices[0], vertices[1], 0.0f },
-					.v2 = { vertices[2], vertices[3], 0.0f },
-					.v3 = { vertices[4], vertices[5], 0.0f },
+					.v1 = { vertices[0], vertices[1], 0.0f, 0.0f, 0.0f },
+					.v2 = { vertices[2], vertices[3], 0.0f, 0.0f, 0.0f },
+					.v3 = { vertices[4], vertices[5], 0.0f, 0.0f, 0.0f },
 				};
 
 				draw_triangle(triangle);
@@ -219,7 +215,10 @@ static void gp0_misc(uint32_t value)
 			}
 			else
 			{
-				float vertices[8] = { 0 };
+				// 4 vertices with two coordinates each
+				float vertices[8] = {0};
+				// 4 vertices with 3 colors each
+				float colors[12] = {0};
 
 				for (int i = 0; i < 4; i++)
 				{
@@ -227,20 +226,26 @@ static void gp0_misc(uint32_t value)
 					uint32_t xy_pos = gpu_state.command_buffer[i * vertex_word_size + 1];
 					vertices[i * 2] = xy_pos & 0xFFFF;
 					vertices[i * 2 + 1] = (xy_pos & 0xFFFF0000) >> 16;
+
+					if (!is_gouraud_shading)
+					{
+						// Get color from first vertex when using flat shading
+						colors[i * 3 + 2] = (command_value & 0x0000FF); // B
+						colors[i * 3 + 1] = (command_value & 0x00FF00) >> 8; // G
+						colors[i * 3] = (command_value & 0xFF0000) >> 16; // R
+					}
 				}
 
 				Quad quad = {
-					.v1 = { vertices[0], vertices[1], 0.0f },
-					.v2 = { vertices[2], vertices[3], 0.0f },
-					.v3 = { vertices[4], vertices[5], 0.0f },
-					.v4 = { vertices[6], vertices[7], 0.0f },
+					.v1 = { vertices[0], vertices[1], colors[0], colors[1], colors[2] },
+					.v2 = { vertices[2], vertices[3], colors[3], colors[4], colors[5] },
+					.v3 = { vertices[4], vertices[5], colors[6], colors[7], colors[8] },
+					.v4 = { vertices[6], vertices[7], colors[9], colors[10], colors[11] },
 				};
 
 				draw_quad(quad);
 				finish_gp0_command();
 			}
-
-			log_warning("Finished polygon GP0 command\n");
 		}
 	}
 	else
@@ -272,6 +277,7 @@ static void handle_gp0_command(uint32_t value)
 
 		case GP0_POLYGON:
 			start_gp0_command(value, GP0_POLYGON);
+			log_info("GP0 command is %x\n", value);
 			break;
 
 		case GP0_LINE:
@@ -341,8 +347,6 @@ static void update_gpustat()
 
 	uint32_t new_stat = 0;
 
-	log_debug("Updating GPUSTAT...\n");
-
 	new_stat |= status.texture_page_x_base & 0xF;
 	new_stat |= status.texture_page_y_base_1 << 1;
 	new_stat |= status.semi_transparency << 5;
@@ -372,7 +376,6 @@ static void update_gpustat()
 	new_stat |= status.dma_direction << 29;
 	new_stat |= status.drawing_odd_lines << 31;
 
-	log_debug("Old value is %x and new value is %x\n", gpu_state.gpu_stat, new_stat);
 	gpu_state.gpu_stat = new_stat;
 }
 
@@ -506,6 +509,4 @@ void write_gpu(uint32_t address, uint32_t value)
 		handle_gp1_command(value);
 	else
 		log_warning("Unhandled GPU register write at address %x with value %x\n", address, value);
-
-	//log_warning("Unhandled GPU register write at address %x with value %x\n", address, value);
 }
