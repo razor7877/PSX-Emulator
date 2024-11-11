@@ -2,6 +2,7 @@
 
 #include "gpu.h"
 #include "logging.h"
+#include "cpu.h"
 
 GPU gpu_state = {
 	.gpu_read = 0,
@@ -33,6 +34,16 @@ uint32_t read_gpu(uint32_t address)
 	return 0xFFFFFFFF;
 }
 
+void write_gpu(uint32_t address, uint32_t value)
+{
+	if (address == 0x1F801810)
+		handle_gp0_command(value);
+	else if (address == 0x1F801814)
+		handle_gp1_command(value);
+	else
+		log_warning("Unhandled GPU register write at address %x with value %x\n", address, value);
+}
+
 static void gp0_env(uint32_t value)
 {
 	// If the first 3 bits are on, then we have a command in the range 0xE1-0xE6
@@ -42,7 +53,7 @@ static void gp0_env(uint32_t value)
 	switch (env_command)
 	{
 		case 0x01:
-			log_debug("GP0(0xE1) - Draw mode settings\n");
+			//log_debug("GP0(0xE1) - Draw mode settings\n");
 			gpu_state.gpu_status.texture_page_x_base = value & 0b1111;
 			gpu_state.gpu_status.texture_page_y_base_1 = (value & (1 << 4)) >> 4;
 			gpu_state.gpu_status.semi_transparency = (value & (0b11 << 5)) >> 5;
@@ -281,7 +292,7 @@ static void handle_gp0_command(uint32_t value)
 			break;
 
 		case GP0_LINE:
-			log_warning("Received GPU line primitive command -- value is %x\n", value);
+			log_warning("Received GPU line primitive command -- value is %x -- pc is %x\n", value, cpu_state.pc);
 			break;
 
 		case GP0_RECTANGLE:
@@ -341,7 +352,7 @@ static inline Vec2 get_screen_resolution(DisplayMode display_mode)
 /// <summary>
 /// Updates the integer GPUSTAT register using the state in GPUStatus
 /// </summary>
-static void update_gpustat()
+void update_gpustat()
 {
 	GPUStatus status = gpu_state.gpu_status;
 
@@ -467,19 +478,18 @@ static void handle_gp1_command(uint32_t value)
 			break;
 
 		case GP1_DISPLAY_START_VRAM:
-			log_warning("GP1 Command: Start of display area in VRAM\n");
+			gpu_state.display_area_start = value;
 			break;
 
 		case GP1_DISPLAY_RANGE_H:
-			log_warning("GP1 Command: Horizontal display range\n");
+			gpu_state.display_range_horizontal = value;
 			break;
 
 		case GP1_DISPLAY_RANGE_V:
-			log_warning("GP1 Command: Vertical display range\n");
+			gpu_state.display_range_vertical = value;
 			break;
 
 		case GP1_DISPLAY_MODE:
-			log_debug("GP1 Command: Display mode\n");
 			gp1_display_mode(value);
 			break;
 
@@ -499,14 +509,4 @@ static void handle_gp1_command(uint32_t value)
 			log_error("Unhandled GP1 command!\n");
 			break;
 	}
-}
-
-void write_gpu(uint32_t address, uint32_t value)
-{
-	if (address == 0x1F801810)
-		handle_gp0_command(value);
-	else if (address == 0x1F801814)
-		handle_gp1_command(value);
-	else
-		log_warning("Unhandled GPU register write at address %x with value %x\n", address, value);
 }

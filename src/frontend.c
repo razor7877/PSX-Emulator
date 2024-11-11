@@ -316,7 +316,7 @@ void resize_psx_framebuffer(Vec2 new_size)
 
     create_psx_framebuffer();
 
-    log_debug("PSX Framebuffer was resized! New size is %f by %f\n", new_size.x, new_size.y);
+    //log_debug("PSX Framebuffer was resized! New size is %f by %f\n", new_size.x, new_size.y);
 }
 
 int start_interface()

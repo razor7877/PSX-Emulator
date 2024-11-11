@@ -538,8 +538,6 @@ void lh()
 
     int32_t sign_extended = (int32_t)half_word;
 
-    log_info("LH instr addr %x with value %x\n", address, word);
-
     delay_reg_fetch(rt(cpu_state.current_opcode), sign_extended);
 }
 

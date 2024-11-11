@@ -10,6 +10,7 @@
 #include "tests.h"
 #include "frontend.h"
 #include "logging.h"
+#include "gpu.h"
 
 const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
 //const char exe_path[] = "roms/gpu/triangle/triangle.exe";
@@ -120,9 +121,13 @@ int main(int argc, char** argv)
 			handle_instruction(debug_state.print_instructions);
 			cycle_count++;
 
-			if (!finished_bios_boot && cpu_state.pc == 0x80030000)
-				sideload_exe();
+			//if (!finished_bios_boot && cpu_state.pc == 0x80030000)
+			//	sideload_exe();
 		}
+
+		// TODO : Implement proper timings and emulate this correctly
+		gpu_state.gpu_status.drawing_odd_lines = !gpu_state.gpu_status.drawing_odd_lines;
+		update_gpustat();
 
 		if (debug_state.in_debug) // In debug mode, query user input
 			handle_debug_input();

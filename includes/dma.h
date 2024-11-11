@@ -21,6 +21,20 @@ typedef enum
 } DMATransferDirection;
 
 /// <summary>
+/// A DMA device (GPU, SPU, CDROM etc.)
+/// </summary>
+typedef enum
+{
+	DMA_DEVICE_MDEC_IN = 0,
+	DMA_DEVICE_MDEC_OUT = 1,
+	DMA_DEVICE_GPU = 2,
+	DMA_DEVICE_CDROM = 3,
+	DMA_DEVICE_SPU = 4,
+	DMA_DEVICE_PIO = 5,
+	DMA_DEVICE_OTC = 6,
+} DMADevice;
+
+/// <summary>
 /// Represents the state of a DMA channel (CHCR settings)
 /// </summary>
 typedef struct
@@ -43,6 +57,7 @@ typedef struct
 	uint32_t dma_bcr; // DMA Block control
 	uint32_t dma_chcr; // DMA Channel control
 	DMATransferState transfer_state;
+	DMADevice dma_device;
 } DMAChannel;
 
 /// <summary>
@@ -57,3 +72,8 @@ typedef struct
 
 uint32_t read_dma_regs(uint32_t address);
 void write_dma_regs(uint32_t address, uint32_t value);
+
+static void start_linked_list_dma(DMAChannel* channel);
+static void start_burst_dma(DMAChannel* channel);
+static void start_sliced_dma(DMAChannel* channel);
+static void handle_dma_transfer(DMAChannel* channel);

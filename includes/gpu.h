@@ -201,15 +201,55 @@ typedef struct
 	/// </summary>
 	uint32_t command_buffer[13];
 
+	/// <summary>
+	/// GP0(0xE2)
+	/// </summary>
 	Vec2 texture_window_mask;
+
+	/// <summary>
+	/// GP0(0xE2)
+	/// </summary>
 	Vec2 texture_window_offset;
 
+	/// <summary>
+	/// GP0(0xE3)
+	/// </summary>
 	Vec2 drawing_area_top_left;
+
+	/// <summary>
+	/// GP0(0xE4)
+	/// </summary>
 	Vec2 drawing_area_bottom_right;
+
+	/// <summary>
+	/// GP0(0xE5)
+	/// </summary>
 	Vec2 drawing_area_offset;
 
+	/// <summary>
+	/// GP0(0xE6)
+	/// </summary>
 	bool set_mask_while_drawing;
+
+	/// <summary>
+	/// GP0(0xE6)
+	/// </summary>
 	bool check_mask_before_draw;
+
+	/// <summary>
+	/// Raw data - GP1(0x05)
+	/// </summary>
+	uint32_t display_area_start;
+
+	/// <summary>
+	/// Raw data - GP1(0x06)
+	/// </summary>
+	uint32_t display_range_horizontal;
+
+	/// <summary>
+	/// Raw data - GP1(0x07)
+	/// </summary>
+	uint32_t display_range_vertical;
 } GPU;
 
 extern GPU gpu_state;
@@ -228,4 +268,15 @@ uint32_t read_gpu(uint32_t address);
 /// <param name="value">The value to write to the address</param>
 void write_gpu(uint32_t address, uint32_t value);
 
-static void update_gpustat();
+static void gp0_env(uint32_t value);
+static void finish_gp0_command();
+static void gp0_misc(uint32_t value);
+static void start_gp0_command(uint32_t value, GP0Command command);
+static void handle_gp0_command(uint32_t value);
+
+static inline Vec2 get_screen_resolution(DisplayMode display_mode);
+
+void update_gpustat();
+static void update_gpustat_display_mode(DisplayMode display_mode);
+static void gp1_display_mode(uint32_t value);
+static void handle_gp1_command(uint32_t value);
