@@ -12,6 +12,8 @@
 #include "logging.h"
 
 const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
+//const char exe_path[] = "roms/gpu/triangle/triangle.exe";
+const char exe_path[] = "roms/psxtest_cpu.exe";
 
 bool finished_bios_boot = false;
 
@@ -59,7 +61,7 @@ static void print_exe_header(EXEHeader file_header)
 /// <returns>0 if the sideloading worked, -1 otherwise</returns>
 static int sideload_exe()
 {
-	FILE* exe_file = fopen("roms/psxtest_cpu.exe", "rb");
+	FILE* exe_file = fopen(exe_path, "rb");
 	if (!exe_file)
 	{
 		log_error("Error while trying to load the EXE file!\n");
@@ -118,8 +120,8 @@ int main(int argc, char** argv)
 			handle_instruction(debug_state.print_instructions);
 			cycle_count++;
 
-			//if (!finished_bios_boot && cpu_state.pc == 0x80030000)
-			//	sideload_exe();
+			if (!finished_bios_boot && cpu_state.pc == 0x80030000)
+				sideload_exe();
 		}
 
 		if (debug_state.in_debug) // In debug mode, query user input

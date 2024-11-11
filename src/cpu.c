@@ -516,13 +516,20 @@ void lh()
     uint32_t base_addr = R(rs(cpu_state.current_opcode));
 
     // Get signed offset from 16 lower bits
-    int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
+    int16_t offset = (int16_t)(cpu_state.current_opcode & 0xFFFF);
 
     int address = base_addr + offset;
 
+    if ((address & 0b1) != 0)
+    {
+        log_error("Unaligned address exception with lh instruction!\n");
+        handle_mem_exception(ADEL, address);
+        return;
+    }
+
     // Get the word that contains the byte
     uint16_t half_word_index = (address & 0b10) >> 1;
-    uint16_t word = (uint16_t)read_word(address - half_word_index * 2);
+    uint32_t word = (uint32_t)read_word(address - half_word_index * 2);
 
     // First byte in first 8 bits, second in the next 8 and so on
     uint32_t mask = 0xFFFF << (half_word_index * 16);
@@ -530,6 +537,9 @@ void lh()
     int16_t half_word = (word & mask) >> (half_word_index * 16);
 
     int32_t sign_extended = (int32_t)half_word;
+
+    log_info("LH instr addr %x with value %x\n", address, word);
+
     delay_reg_fetch(rt(cpu_state.current_opcode), sign_extended);
 }
 
@@ -603,6 +613,13 @@ void lhu()
     int16_t offset = (int16_t)(cpu_state.current_opcode & 0x0000FFFF);
 
     int address = base_addr + offset;
+
+    if ((address & 0b1) != 0)
+    {
+        log_error("Unaligned address exception with lhu instruction!\n");
+        handle_mem_exception(ADEL, address);
+        return;
+    }
 
     // Get the word that contains the byte
     uint16_t half_word_index = (address & 0b10) >> 1;
@@ -928,7 +945,7 @@ void op_div()
     {
         log_warning("DIV instruction attempted divide by zero!\n");
         cpu_state.hi = rs_val;
-        cpu_state.lo = -1;
+        cpu_state.lo = rs_val >= 0 ? 0xFFFFFFFF : 1;
     }
     else
     {
