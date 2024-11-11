@@ -6,6 +6,7 @@
 #include "main.h"
 
 #define WORD_SIZE 4
+#define HALF_WORD_SIZE 2
 #define KIB_SIZE 1024
 #define KIB_TO_WORD_SIZE (KIB_SIZE / WORD_SIZE)
 

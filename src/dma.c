@@ -207,7 +207,36 @@ static void start_burst_dma(DMAChannel* channel)
 
 static void start_sliced_dma(DMAChannel* channel)
 {
-	log_warning("Unhandled DMA transfer -- Sliced DMA -- PC is %x\n", cpu_state.pc);
+	DMATransferState* state = &channel->transfer_state;
+
+	if (state->dma_direction != DMA_RAM_TO_DEVICE)
+	{
+		log_warning("Unhandled DMA transfer -- Linked list in device to ram direction\n");
+		return;
+	}
+
+	if (channel->dma_device != DMA_DEVICE_GPU)
+	{
+		log_warning("Unhandled DMA transfer -- Linked list with a device that is NOT the GPU\n");
+		return;
+	}
+
+	uint16_t block_size = channel->dma_bcr & 0xFFFF;
+	uint16_t block_count = (channel->dma_bcr & 0xFFFF0000) >> 16;
+
+	int total_size = block_count * block_size;
+	int increment = channel->transfer_state.madr_increment ? -4 : 4;
+
+	log_info("Doing sliced DMA -- Block count is %x with a block size of %x words (total size is %d)\n", block_count, block_size, total_size);
+
+	while (total_size--)
+	{
+		write_word(0x1F801810, read_word(channel->dma_madr));
+		channel->dma_madr += increment;
+	}
+
+	// Clear block count to 0 since we finished the transfer
+	channel->dma_bcr &= 0xFFFF;
 }
 
 static void handle_dma_transfer(DMAChannel* channel)

@@ -529,7 +529,7 @@ void lh()
 
     // Get the word that contains the byte
     uint16_t half_word_index = (address & 0b10) >> 1;
-    uint32_t word = (uint32_t)read_word(address - half_word_index * 2);
+    uint32_t word = read_word(address - half_word_index * 2);
 
     // First byte in first 8 bits, second in the next 8 and so on
     uint32_t mask = 0xFFFF << (half_word_index * 16);

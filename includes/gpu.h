@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "frontend.h"
+#include <memory.h>
 
 /// <summary>
 /// The possible GP0 commands
@@ -192,6 +193,16 @@ typedef struct
 	GP0Command current_gp0_command;
 
 	/// <summary>
+	/// When doing CPU to VRAM blit, how many words we still need to consume
+	/// </summary>
+	int blit_words_remaining;
+
+	/// <summary>
+	/// The destination address to blit into in VRAM, in half words
+	/// </summary>
+	int blit_destination_address;
+
+	/// <summary>
 	/// The index of the last index in the command buffer
 	/// </summary>
 	int command_buffer_index;
@@ -250,6 +261,11 @@ typedef struct
 	/// Raw data - GP1(0x07)
 	/// </summary>
 	uint32_t display_range_vertical;
+
+	/// <summary>
+	/// The VRAM contains 1024 KiB of VRAM as 16 bit words/pixels
+	/// </summary>
+	uint16_t vram[1024 * KIB_SIZE / HALF_WORD_SIZE];
 } GPU;
 
 extern GPU gpu_state;

@@ -6,11 +6,13 @@
 
 GPU gpu_state = {
 	.gpu_read = 0,
-	.gpu_stat = 0xFFFFFFFF,
+	.gpu_stat = 0,
 	.gpu_status = {0},
 	.display_mode = 0,
 	.running_gp0_command = false,
 	.current_gp0_command = 0,
+	.blit_words_remaining = 0,
+	.command_buffer_index = 0,
 	.command_buffer = {0},
 	.texture_window_mask = {0},
 	.texture_window_offset = {0},
@@ -19,6 +21,10 @@ GPU gpu_state = {
 	.drawing_area_offset = {0},
 	.set_mask_while_drawing = false,
 	.check_mask_before_draw = false,
+	.display_area_start = 0,
+	.display_range_horizontal = 0,
+	.display_range_vertical = 0,
+	.vram = { 0xF800 },
 };
 
 uint32_t read_gpu(uint32_t address)
@@ -122,6 +128,9 @@ static void finish_gp0_command()
 	gpu_state.command_buffer_index = 0;
 
 	memset(gpu_state.command_buffer, 0, sizeof(gpu_state.command_buffer));
+
+	gpu_state.blit_destination_address = 0;
+	gpu_state.blit_words_remaining = 0;
 }
 
 static void gp0_misc(uint32_t value)
@@ -156,20 +165,30 @@ static void gp0_misc(uint32_t value)
 		gpu_state.command_buffer[gpu_state.command_buffer_index] = value;
 		gpu_state.command_buffer_index++;
 		
-		if (gpu_state.command_buffer_index >= 4)
+		if (gpu_state.command_buffer_index >= 3)
 		{
-			uint16_t x_pos = gpu_state.command_buffer[2] & 0xFFFF;
-			uint16_t y_pos = (gpu_state.command_buffer[2] & 0xFFFF0000) >> 16;
+			uint16_t x_pos = gpu_state.command_buffer[1] & 0xFFFF;
+			uint16_t y_pos = (gpu_state.command_buffer[1] & 0xFFFF0000) >> 16;
 
-			uint16_t x_size = gpu_state.command_buffer[3] & 0xFFFF;
-			uint16_t y_size = (gpu_state.command_buffer[3] & 0xFFFF0000) >> 16;
+			uint16_t x_size = gpu_state.command_buffer[2] & 0xFFFF;
+			uint16_t y_size = (gpu_state.command_buffer[2] & 0xFFFF0000) >> 16;
 
-			log_info("Finishing CPU to VRAM blit command -- dest is %x %x -- size is %x %x\n",
+			int word_count = x_size * y_size;
+
+			log_info("Starting CPU to VRAM blit -- dest is %x %x -- size is %x %x (%x)\n",
 				x_pos, y_pos,
-				x_size, y_size
+				x_size, y_size,
+				word_count
 			);
 
-			finish_gp0_command();
+			// Round up if we have an uneven number of pixels, since we send 2 words at a time
+			word_count = (word_count + 1) & ~1;
+
+			// VRAM is laid out as 512 lines of 2048 bytes / 4096 half words
+			int dest_location = y_pos * 4096 + x_pos;
+
+			gpu_state.blit_words_remaining = word_count / 2;
+			gpu_state.blit_destination_address = dest_location;
 		}
 	}
 	else if (gpu_state.current_gp0_command == GP0_POLYGON)
@@ -277,6 +296,25 @@ static void start_gp0_command(uint32_t value, GP0Command command)
 
 static void handle_gp0_command(uint32_t value)
 {
+	// If we are running a CPU to VRAM blit, consume the command instead as data
+	if (gpu_state.blit_words_remaining)
+	{
+		//log_info("Consuming CPU to VRAM data... Got %x value, We still need %d words\n", value, gpu_state.blit_words_remaining);
+		gpu_state.blit_words_remaining--;
+
+		uint16_t mapped_address = gpu_state.blit_destination_address / HALF_WORD_SIZE;
+
+		gpu_state.vram[mapped_address] = value & 0xFFFF;
+		gpu_state.vram[mapped_address + 1] = (value & 0xFFFF0000) >> 16;
+
+		gpu_state.blit_destination_address += 2;
+
+		if (gpu_state.blit_words_remaining == 0)
+			finish_gp0_command();
+
+		return;
+	}
+
 	uint32_t command_mask = (0b111 << 29);
 	uint32_t command = (value & command_mask) >> 29;
 

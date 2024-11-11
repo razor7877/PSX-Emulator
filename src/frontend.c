@@ -3,6 +3,7 @@
 #include "frontend.h"
 #include "logging.h"
 #include "debug.h"
+#include <gpu.h>
 
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
@@ -319,6 +320,8 @@ void resize_psx_framebuffer(Vec2 new_size)
     //log_debug("PSX Framebuffer was resized! New size is %f by %f\n", new_size.x, new_size.y);
 }
 
+GLuint vram_texture = 0;
+
 int start_interface()
 {
 	if (setup_glfw() != 0)
@@ -326,29 +329,19 @@ int start_interface()
 
     compile_shaders();
     create_psx_framebuffer();
+
+    glGenTextures(1, &vram_texture);
+    glBindTexture(GL_TEXTURE_2D, vram_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB5_A1, 512, 2048, 0, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
     
 	return 0;
 }
 
+uint16_t test[524288] = { 0xFFFF };
+
 int update_interface()
 {
-    //Triangle tri = {
-    //    .v1 = { 0.0f, 0.0f, 0.0f },
-    //    .v2 = { 240.0f, 0.0f, 0.0f },
-    //    .v3 = { 240.0f, 240.0f, 0.0f },
-    //};
-
-    //draw_triangle(tri);
-
-    /*Quad quad = {
-        .v1 = { 0.0f, 0.0f, 0.0f },
-        .v2 = { 200.0f, 0.0f, 0.0f },
-        .v3 = { 0.0f, 200.0f, 0.0f },
-        .v4 = { 200.0f, 200.0f, 0.0f },
-    };
-
-    draw_quad(quad);*/
-
     // Blit from PSX framebuffer to window framebuffer
     glBindFramebuffer(GL_READ_FRAMEBUFFER, PSX_RT.framebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -358,6 +351,10 @@ int update_interface()
 
     glScissor(0, 0, src_size.x, src_size.y);
     glBlitFramebuffer(0, 0, src_size.x, src_size.y, 0, 0, tgt_size.x, tgt_size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    glBindTexture(GL_TEXTURE_2D, vram_texture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 512, 2048, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, test);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     int glError = glGetError();
     if (glError != 0)
@@ -369,6 +366,8 @@ int update_interface()
 
 	if (glfwWindowShouldClose(frontend_state.window))
 		return 1;
+
+    glDeleteTextures(1, &vram_texture);
 
 	return 0;
 }
