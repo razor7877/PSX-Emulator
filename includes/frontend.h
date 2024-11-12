@@ -13,6 +13,12 @@ typedef struct
 
 typedef struct
 {
+	int x;
+	int y;
+} iVec2;
+
+typedef struct
+{
 	union
 	{
 		float x;
@@ -29,6 +35,25 @@ typedef struct
 		float b;
 	};
 } Vec3;
+
+typedef struct
+{
+	union
+	{
+		int x;
+		int r;
+	};
+	union
+	{
+		int y;
+		int g;
+	};
+	union
+	{
+		int z;
+		int b;
+	};
+} iVec3;
 
 typedef struct
 {
@@ -64,6 +89,7 @@ typedef struct
 {
 	GLFWwindow* window;
 	GLuint solid_shader;
+	GLuint blit_shader;
 	RenderTarget* current_render_target;
 	RenderTarget psx_render_target;
 	RenderTarget vram_render_target;
@@ -87,7 +113,7 @@ void draw_quad(Quad quad);
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 static int setup_glfw();
-static void compile_shaders();
+static GLuint compile_shader(const char* v_shader, const char* f_shader);
 static void create_framebuffer(RenderTarget* render_target);
 
 /// <summary>

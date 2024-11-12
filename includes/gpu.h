@@ -197,10 +197,13 @@ typedef struct
 	/// </summary>
 	int blit_words_remaining;
 
-	/// <summary>
-	/// The destination address to blit into in VRAM, in half words
-	/// </summary>
-	int blit_destination_address;
+	iVec2 blit_size;
+
+	iVec2 blit_position;
+
+	int blit_x_count;
+
+	int blit_y_count;
 
 	/// <summary>
 	/// The index of the last index in the command buffer

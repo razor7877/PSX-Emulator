@@ -130,8 +130,9 @@ static void finish_gp0_command()
 
 	memset(gpu_state.command_buffer, 0, sizeof(gpu_state.command_buffer));
 
-	gpu_state.blit_destination_address = 0;
 	gpu_state.blit_words_remaining = 0;
+	gpu_state.blit_x_count = 0;
+	gpu_state.blit_y_count = 0;
 }
 
 static void gp0_misc(uint32_t value)
@@ -171,28 +172,32 @@ static void gp0_misc(uint32_t value)
 			uint16_t x_pos = gpu_state.command_buffer[1] & 0x3FF;
 			uint16_t y_pos = (gpu_state.command_buffer[1] & 0x1FF0000) >> 16;
 
+			gpu_state.blit_position.x = x_pos;
+			gpu_state.blit_position.y = y_pos;
+
 			uint16_t x_size = gpu_state.command_buffer[2] & 0xFFFF;
 			uint16_t y_size = (gpu_state.command_buffer[2] & 0xFFFF0000) >> 16;
 
-			x_size = ((x_size - 1) & 0x3FF) + 1;
-			y_size = ((y_size - 1) & 0x1FF) + 1;
+			gpu_state.blit_size.x = ((x_size - 1) & 0x3FF) + 1;
+			gpu_state.blit_size.y = ((y_size - 1) & 0x1FF) + 1;
 
 			int word_count = ((x_size * y_size) + 1) & 0xFFFFFFFE;
 
 			// VRAM is laid out as 512 lines of 2048 bytes / 1024 half words
 			int dest_location = y_pos * 1024 + x_pos;
 
+			// Round up if we have an uneven number of pixels, since we send 2 words at a time
+			word_count = (word_count + 1) & ~1;
+
+			gpu_state.blit_words_remaining = word_count / 2;
+			gpu_state.blit_x_count = 0;
+			gpu_state.blit_y_count = 0;
+
 			log_info("Starting CPU to VRAM blit -- dest is %x %x -- size is %x %x (%x)\n",
 				x_pos, y_pos,
 				x_size, y_size,
 				word_count
 			);
-
-			// Round up if we have an uneven number of pixels, since we send 2 words at a time
-			word_count = (word_count + 1) & ~1;
-
-			gpu_state.blit_words_remaining = word_count / 2;
-			gpu_state.blit_destination_address = dest_location;
 		}
 	}
 	else if (gpu_state.current_gp0_command == GP0_POLYGON)
@@ -328,16 +333,43 @@ static void handle_gp0_command(uint32_t value)
 	// If we are running a CPU to VRAM blit, consume the command instead as data
 	if (gpu_state.blit_words_remaining)
 	{
+		// Transfer first half word
+		int x_pos = (gpu_state.blit_position.x + gpu_state.blit_x_count) & 0x3FF;
+		int y_pos = (gpu_state.blit_position.y + gpu_state.blit_y_count) & 0x1FF;
+
+		gpu_state.vram[y_pos * 1024 + x_pos] = value & 0xFFFF;
+
+		gpu_state.blit_x_count++;
+
+		x_pos = (gpu_state.blit_position.x + gpu_state.blit_x_count) & 0x3FF;
+		y_pos = (gpu_state.blit_position.y + gpu_state.blit_y_count) & 0x1FF;
+
+		// Check for wrapping
+		if (gpu_state.blit_x_count == gpu_state.blit_size.x)
+		{
+			gpu_state.blit_y_count++;
+			gpu_state.blit_x_count = 0;
+
+			x_pos = (gpu_state.blit_position.x + gpu_state.blit_x_count) & 0x3FF;
+			y_pos = (gpu_state.blit_position.y + gpu_state.blit_y_count) & 0x1FF;
+		}
+
+		// Transfer second half word
+		gpu_state.vram[y_pos * 1024 + x_pos] = (value & 0xFFFF0000) >> 16;
+
+		gpu_state.blit_x_count++;
+
+		// Check wrapping again
+		if (gpu_state.blit_x_count == gpu_state.blit_size.x)
+		{
+			gpu_state.blit_y_count++;
+			gpu_state.blit_x_count = 0;
+
+			x_pos = (gpu_state.blit_position.x + gpu_state.blit_x_count) & 0x3FF;
+			y_pos = (gpu_state.blit_position.y + gpu_state.blit_y_count) & 0x1FF;
+		}
+
 		gpu_state.blit_words_remaining--;
-
-		uint16_t mapped_address = gpu_state.blit_destination_address / HALF_WORD_SIZE;
-
-		gpu_state.vram[mapped_address] = value & 0xFFFF;
-		gpu_state.vram[mapped_address + 1] = (value & 0xFFFF0000) >> 16;
-
-		gpu_state.blit_destination_address += 2;
-
-		//log_info("Consuming CPU to VRAM data... Got %x value stored at %x and %x, We still need %d words\n", value, mapped_address, mapped_address + 1, gpu_state.blit_words_remaining);
 
 		if (gpu_state.blit_words_remaining == 0)
 			finish_gp0_command();

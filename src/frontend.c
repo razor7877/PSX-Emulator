@@ -15,6 +15,47 @@
 #define PSX_RT frontend_state.psx_render_target
 #define VRAM_RT frontend_state.vram_render_target
 
+const char* solid_v_shader =
+    "#version 410 core\n"
+    "layout(location = 0) in vec3 aPos;"
+    "layout(location = 1) in vec3 aColor;"
+    "out vec3 color;"
+    "void main()"
+    "{"
+    "   gl_Position = vec4(aPos, 1.0);"
+    "   color = aColor;"
+    "}";
+
+const char* solid_f_shader =
+    "#version 410 core\n"
+    "in vec3 color;"
+    "out vec4 FragColor;"
+    "void main()"
+    "{"
+    "   FragColor = vec4(color, 0.0);"
+    "}";
+
+const char* blit_v_shader =
+    "#version 410 core\n"
+    "layout(location = 0) in vec3 aPos;"
+    "layout(location = 1) in vec2 aTexCoord;"
+    "out vec2 texCoord;"
+    "void main()"
+    "{"
+    "   gl_Position = vec4(aPos, 1.0);"
+    "   texCoord = aTexCoord;"
+    "}";
+
+const char* blit_f_shader =
+    "#version 410 core\n"
+    "in vec2 texCoord;"
+    "out vec4 FragColor;"
+    "uniform sampler2D textureSampler;"
+    "void main()"
+    "{"
+    "   FragColor = texture(textureSampler, texCoord);"
+    "}";
+
 Frontend frontend_state = {
 	.window = NULL,
     .solid_shader = 0,
@@ -254,34 +295,16 @@ static int setup_glfw()
 	return 0;
 }
 
-static void compile_shaders()
+static GLuint compile_shader(const char* v_shader, const char* f_shader)
 {
-    const char* vShaderCode =
-        "#version 410 core\n"
-        "layout(location = 0) in vec3 aPos;"
-        "layout(location = 1) in vec3 aColor;"
-        "out vec3 color;"
-        "void main()"
-        "{"
-        "   gl_Position = vec4(aPos, 1.0);"
-        "   color = aColor;"
-        "}";
-
-    const char* fShaderCode =
-        "#version 410 core\n"
-        "in vec3 color;"
-        "out vec4 FragColor;"
-        "void main()"
-        "{"
-        "   FragColor = vec4(color, 0.0);"
-        "}";
+    GLuint program = 0;
 
     unsigned int vertex, fragment;
     int success;
     char infoLog[512];
 
     vertex = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex, 1, &vShaderCode, NULL);
+    glShaderSource(vertex, 1, &v_shader, NULL);
     glCompileShader(vertex);
 
     glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
@@ -289,10 +312,11 @@ static void compile_shaders()
     {
         glGetShaderInfoLog(vertex, 512, NULL, infoLog);
         log_error("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n %s\n", infoLog);
+        return 0;
     }
 
     fragment = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment, 1, &fShaderCode, NULL);
+    glShaderSource(fragment, 1, &f_shader, NULL);
     glCompileShader(fragment);
 
     glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
@@ -300,22 +324,26 @@ static void compile_shaders()
     {
         glGetShaderInfoLog(fragment, 512, NULL, infoLog);
         log_error("ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n%s\n", infoLog);
+        return 0;
     }
 
-    frontend_state.solid_shader = glCreateProgram();
-    glAttachShader(frontend_state.solid_shader, vertex);
-    glAttachShader(frontend_state.solid_shader, fragment);
-    glLinkProgram(frontend_state.solid_shader);
+    program = glCreateProgram();
+    glAttachShader(program, vertex);
+    glAttachShader(program, fragment);
+    glLinkProgram(program);
 
-    glGetProgramiv(frontend_state.solid_shader, GL_LINK_STATUS, &success);
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success)
     {
-        glGetProgramInfoLog(frontend_state.solid_shader, 512, NULL, infoLog);
+        glGetProgramInfoLog(program, 512, NULL, infoLog);
         log_error("ERROR::SHADER::PROGRAM::LINKING_FAILED\n%s\n", infoLog);
+        return 0;
     }
 
     glDeleteShader(vertex);
     glDeleteShader(fragment);
+
+    return program;
 }
 
 static void create_framebuffer(RenderTarget* render_target)
@@ -332,7 +360,7 @@ static void create_framebuffer(RenderTarget* render_target)
     // Render texture for the framebuffer
     glGenTextures(1, &render_target->render_texture);
     glBindTexture(GL_TEXTURE_2D, render_target->render_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, render_target->size.x, render_target->size.y, 0, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, render_target->size.x, render_target->size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -367,40 +395,104 @@ static void resize_framebuffer(RenderTarget* render_target, Vec2 new_size)
     create_framebuffer(render_target);
 }
 
-uint32_t test[VRAM_WIDTH * VRAM_HEIGHT] = {0};
+GLuint vram_tex = 0;
+GLuint blit_quad_vao = 0;
+GLuint blit_quad_vbo = 0;
+GLuint blit_quad_texture_bo = 0;
+
+const float quad_verts[] = {
+    -1.0f, 1.0f, 0.0f, // Top left
+    1.0f, 1.0f, 0.0f, // Top right
+    -1.0f, -1.0f, 0.0f, // Bottom left
+
+    1.0f, 1.0f, 0.0f, // Top right
+    1.0f, -1.0f, 0.0f, // Bottom right
+    -1.0f, -1.0f, 0.0f, // Bottom left
+};
+
+const float quad_tex_coords[] = {
+    0.0f, 0.0f, // Top left
+    1.0f, 0.0f, // Top right
+    0.0f, 1.0f, // Bottom left
+
+    1.0f, 0.0f, // Top right
+    1.0f, 1.0f, // Bottom right
+    0.0f, 1.0f, // Bottom left
+};
+
+static void setup_blit_quad()
+{
+    // Generate VAO and VBO and bind them
+    glGenVertexArrays(1, &blit_quad_vao);
+    glGenBuffers(1, &blit_quad_vbo);
+
+    glBindVertexArray(blit_quad_vao);
+
+    // Send vertices
+    glBindBuffer(GL_ARRAY_BUFFER, blit_quad_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_verts), quad_verts, GL_STATIC_DRAW);
+
+    // Enable layout 0 input in shader
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Send tex coords
+    glGenBuffers(1, &blit_quad_texture_bo);
+
+    glBindBuffer(GL_ARRAY_BUFFER, blit_quad_texture_bo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_tex_coords), quad_tex_coords, GL_STATIC_DRAW);
+
+    // Enable layout 1 input in shader
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+}
 
 int start_interface()
 {
 	if (setup_glfw() != 0)
 		return -1;
 
-    compile_shaders();
+    frontend_state.solid_shader = compile_shader(solid_v_shader, solid_f_shader);
+    frontend_state.blit_shader = compile_shader(blit_v_shader, blit_f_shader);
+
     create_framebuffer(&PSX_RT);
     create_framebuffer(&VRAM_RT);
+
+    setup_blit_quad();
+
+    // Render texture for the VRAM
+    glGenTextures(1, &vram_tex);
+    glBindTexture(GL_TEXTURE_2D, vram_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, VRAM_WIDTH, VRAM_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV, 0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	return 0;
 }
 
 int update_interface()
 {
-    /*Quad quad = {
-        .v1 = { 0.0f, 0.0f, 255.0f },
-        .v2 = { 200.0f, 0.0f, 255.0f },
-        .v3 = { 0.0f, 200.0f, 255.0f },
-        .v4 = { 200.0f, 200.0f, 255.0f },
-    };
-    draw_quad(quad);
-    
-    Triangle tri = {
-     .v1 = { 0.0f, 0.0f, 0.0f, 255.0f },
-     .v2 = { 240.0f, 0.0f, 0.0f },
-     .v3 = { 240.0f, 240.0f, 0.0f },
-    };
-    draw_triangle(tri);*/
-
-    glBindTexture(GL_TEXTURE_2D, VRAM_RT.render_texture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, VRAM_WIDTH, VRAM_HEIGHT, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, gpu_state.vram);
+    // Send VRAM data to the texture
+    glBindTexture(GL_TEXTURE_2D, vram_tex);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, VRAM_WIDTH, VRAM_HEIGHT, GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV, gpu_state.vram);
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Render to the framebuffer with a quad
+    glBindFramebuffer(GL_FRAMEBUFFER, VRAM_RT.framebuffer);
+    glViewport(0, 0, VRAM_WIDTH, VRAM_HEIGHT);
+
+    glBindVertexArray(blit_quad_vao);
+
+    glUseProgram(frontend_state.blit_shader);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, vram_tex);
+    glUniform1i(glGetUniformLocation(frontend_state.blit_shader, "textureSampler"), 0);
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Blit from PSX framebuffer to window framebuffer
     glBindFramebuffer(GL_READ_FRAMEBUFFER, frontend_state.current_render_target->framebuffer);
@@ -409,6 +501,7 @@ int update_interface()
     Vec2 src_size = frontend_state.current_render_target->size;
     Vec2 tgt_size = frontend_state.window_size;
 
+    glViewport(0, 0, tgt_size.x, tgt_size.y);
     glScissor(0, 0, src_size.x, src_size.y);
     glBlitFramebuffer(0, 0, src_size.x, src_size.y, 0, 0, tgt_size.x, tgt_size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
