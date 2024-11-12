@@ -15,7 +15,8 @@
 #define PSX_RT frontend_state.psx_render_target
 #define VRAM_RT frontend_state.vram_render_target
 
-const char* solid_v_shader =
+// Flat/Gouraud polygon shader
+const char* color_v_shader =
     "#version 410 core\n"
     "layout(location = 0) in vec3 aPos;"
     "layout(location = 1) in vec3 aColor;"
@@ -26,15 +27,38 @@ const char* solid_v_shader =
     "   color = aColor;"
     "}";
 
-const char* solid_f_shader =
+const char* color_f_shader =
     "#version 410 core\n"
     "in vec3 color;"
     "out vec4 FragColor;"
     "void main()"
     "{"
-    "   FragColor = vec4(color, 0.0);"
+    "   FragColor = vec4(color, 1.0);"
     "}";
 
+// Textured polygon shader
+const char* texture_v_shader =
+    "#version 410 core\n"
+    "layout(location = 0) in vec3 aPos;"
+    "layout(location = 1) in vec2 aTexCoord;"
+    "out vec2 texCoord;"
+    "void main()"
+    "{"
+    "   gl_Position = vec4(aPos, 1.0);"
+    "   texCoord = aTexCoord;"
+    "}";
+
+const char* texture_f_shader =
+    "#version 410 core\n"
+    "in vec2 texCoord;"
+    "out vec4 FragColor;"
+    "uniform sampler2D textureSampler;"
+    "void main()"
+    "{"
+    "   FragColor = vec4(texCoord, 1.0, 1.0);"
+    "}";
+
+// Blit to quad shader
 const char* blit_v_shader =
     "#version 410 core\n"
     "layout(location = 0) in vec3 aPos;"
@@ -58,7 +82,8 @@ const char* blit_f_shader =
 
 Frontend frontend_state = {
 	.window = NULL,
-    .solid_shader = 0,
+    .color_shader = 0,
+    .blit_shader = 0,
     .current_render_target = &frontend_state.psx_render_target,
     .psx_render_target = {
         .framebuffer = 0,
@@ -122,7 +147,7 @@ void draw_triangle(Triangle triangle)
     };
 
     glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
-    glUseProgram(frontend_state.solid_shader);
+    glUseProgram(frontend_state.color_shader);
 
     GLuint vao = 0;
     GLuint vbo = 0;
@@ -155,6 +180,11 @@ void draw_triangle(Triangle triangle)
     glDeleteBuffers(1, &color_bo);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void draw_textured_triangle(Triangle triangle)
+{
+    log_warning("Unhandled OpenGL function -- draw_textured_triangle !\n");
 }
 
 void draw_quad(Quad quad)
@@ -203,7 +233,7 @@ void draw_quad(Quad quad)
     };
 
     glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
-    glUseProgram(frontend_state.solid_shader);
+    glUseProgram(frontend_state.color_shader);
 
     GLuint vao = 0;
     GLuint vbo = 0;
@@ -234,6 +264,84 @@ void draw_quad(Quad quad)
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
     glDeleteBuffers(1, &color_bo);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void draw_textured_quad(Quad quad)
+{
+    // Prepare vertices for OpenGL
+    float vertices[18] = {
+        (quad.v1.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v1.position.y / PSX_RT.size.y) * 2.0f,
+        0.0f,
+        (quad.v2.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v2.position.y / PSX_RT.size.y) * 2.0f,
+        0.0f,
+        (quad.v3.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v3.position.y / PSX_RT.size.y) * 2.0f,
+        0.0f,
+        (quad.v2.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v2.position.y / PSX_RT.size.y) * 2.0f,
+        0.0f,
+        (quad.v3.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v3.position.y / PSX_RT.size.y) * 2.0f,
+        0.0f,
+        (quad.v4.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v4.position.y / PSX_RT.size.y) * 2.0f,
+        0.0f
+    };
+
+    float uv[12] = {
+        quad.v1.uv.x / 255.0f,
+        (255.0f - quad.v1.uv.y) / 255.0f,
+        quad.v2.uv.x / 255.0f,
+        (255.0f - quad.v2.uv.y) / 255.0f,
+        quad.v3.uv.x / 255.0f,
+        (255.0f - quad.v3.uv.y) / 255.0f,
+        quad.v2.uv.x / 255.0f,
+        (255.0f - quad.v2.uv.y) / 255.0f,
+        quad.v3.uv.x / 255.0f,
+        (255.0f - quad.v3.uv.y) / 255.0f,
+        quad.v4.uv.x / 255.0f,
+        (255.0f - quad.v4.uv.y) / 255.0f,
+    };
+
+    uint32_t texture_page_start = quad.uv_data.texture_page_y_base * 1024 + quad.uv_data.texture_page_x_base;
+    uint32_t clut_start;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
+    glUseProgram(frontend_state.color_shader);
+
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    GLuint texture_bo = 0;
+
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &texture_bo);
+
+    glBindVertexArray(vao);
+
+    // Send vertices
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Send colors
+    glBindBuffer(GL_ARRAY_BUFFER, texture_bo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(uv), uv, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glDeleteVertexArrays(1, &vao);
+    glDeleteBuffers(1, &vbo);
+    glDeleteBuffers(1, &texture_bo);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -452,7 +560,8 @@ int start_interface()
 	if (setup_glfw() != 0)
 		return -1;
 
-    frontend_state.solid_shader = compile_shader(solid_v_shader, solid_f_shader);
+    frontend_state.color_shader = compile_shader(color_v_shader, color_f_shader);
+    frontend_state.texture_shader = compile_shader(texture_v_shader, texture_f_shader);
     frontend_state.blit_shader = compile_shader(blit_v_shader, blit_f_shader);
 
     create_framebuffer(&PSX_RT);

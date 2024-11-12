@@ -244,7 +244,7 @@ static void gp0_misc(uint32_t value)
 			Vec2 positions[4] = {0};
 			Vec3 colors[4] = {0};
 			Vec2 uv_coords[4] = {0};
-			UVData uv_data;
+			UVData uv_data = {0};
 
 			uint16_t clut_index = 0;
 			uint16_t texture_page_info = 0;
@@ -280,9 +280,9 @@ static void gp0_misc(uint32_t value)
 				else
 					color = command_value;
 
-				colors[i].b = (color & 0x0000FF); // B
+				colors[i].r = (color & 0x0000FF); // B
 				colors[i].g = (color & 0x00FF00) >> 8; // G
-				colors[i].r = (color & 0xFF0000) >> 16; // R
+				colors[i].b = (color & 0xFF0000) >> 16; // R
 
 				if (is_textured)
 				{
@@ -296,25 +296,31 @@ static void gp0_misc(uint32_t value)
 			if (is_rectangle)
 			{
 				Quad quad = {
-					.v1 = { positions[0], colors[0] },
-					.v2 = { positions[1], colors[1] },
-					.v3 = { positions[2], colors[2] },
-					.v4 = { positions[3], colors[3] },
+					.v1 = { positions[0], colors[0], uv_coords[0] },
+					.v2 = { positions[1], colors[1], uv_coords[1] },
+					.v3 = { positions[2], colors[2], uv_coords[2] },
+					.v4 = { positions[3], colors[3], uv_coords[3] },
 					.uv_data = uv_data,
 				};
 
-				draw_quad(quad);
+				if (is_textured)
+					draw_textured_quad(quad);
+				else
+					draw_quad(quad);
 			}
 			else
 			{
 				Triangle triangle = {
-					.v1 = { positions[0], colors[0] },
-					.v2 = { positions[1], colors[1] },
-					.v3 = { positions[2], colors[2] },
+					.v1 = { positions[0], colors[0], uv_coords[0] },
+					.v2 = { positions[1], colors[1], uv_coords[1] },
+					.v3 = { positions[2], colors[2], uv_coords[2] },
 					.uv_data = uv_data,
 				};
 
-				draw_triangle(triangle);
+				if (is_textured)
+					draw_textured_triangle(triangle);
+				else
+					draw_triangle(triangle);
 			}
 
 			finish_gp0_command();

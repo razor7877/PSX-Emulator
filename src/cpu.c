@@ -94,7 +94,7 @@ void handle_instruction(bool debug_info)
 
     // Update debug data
     check_tty_output();
-    add_cpu_trace(cpu_state);
+    //add_cpu_trace(cpu_state);
     check_code_breakpoints(cpu_state.pc);
 
     // Jump if we have a jump in delay slot, otherwise increment pc normally
