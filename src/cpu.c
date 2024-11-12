@@ -112,6 +112,7 @@ void handle_instruction(bool debug_info)
     else
         ((void (*)(void))primary_opcodes[primary_opcode].function)();
 
+    // TODO : Fix this because it doesn't work
     // Ugly, used so that a memory load into register gets done at the end of the next instruction
     if (cpu_state.delay_fetch != 0 && --cpu_state.delay_fetch >= 1)
     {

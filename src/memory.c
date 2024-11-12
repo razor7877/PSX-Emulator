@@ -362,8 +362,12 @@ void sideload_exe_into_mem(EXEHeader file_header, FILE* exe_file)
 	// Set the registers using the header info
 	cpu_state.pc = file_header.initial_pc;
 	R28 = file_header.initial_r28;
-	R29 = file_header.initial_r29_r30_address + file_header.initial_r29_r30_offset;
-	R30 = file_header.initial_r29_r30_address + file_header.initial_r29_r30_offset;
+
+	if (file_header.initial_r29_r30_address != 0)
+	{
+		R29 = file_header.initial_r29_r30_address + file_header.initial_r29_r30_offset;
+		R30 = file_header.initial_r29_r30_address + file_header.initial_r29_r30_offset;
+	}
 
 	// Get the mapped address in RAM, and file size
 	uint32_t destination_address = file_header.destination_address - 0x80000000;

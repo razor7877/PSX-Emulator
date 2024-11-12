@@ -56,16 +56,28 @@ void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, 
 void draw_triangle(Triangle triangle)
 {
     // Prepare vertices for OpenGL
-    float vertices[] = {
-        (triangle.v1.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
-        (triangle.v1.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+    float vertices[9] = {
+        triangle.v1.position.x / PSX_RT.size.x - 1.0f,
+        1.0f - triangle.v1.position.y / PSX_RT.size.y,
         0.0f,
-        (triangle.v2.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
-        (triangle.v2.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        triangle.v2.position.x / PSX_RT.size.x - 1.0f,
+        1.0f - triangle.v2.position.y / PSX_RT.size.y,
         0.0f,
-        (triangle.v3.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
-        (triangle.v3.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        triangle.v3.position.x / PSX_RT.size.x - 1.0f,
+        1.0f - triangle.v3.position.y / PSX_RT.size.y,
         0.0f
+    };
+
+    float colors[9] = {
+        triangle.v1.color.r / 255.0f,
+        triangle.v1.color.g / 255.0f,
+        triangle.v1.color.b / 255.0f,
+        triangle.v2.color.r / 255.0f,
+        triangle.v2.color.g / 255.0f,
+        triangle.v2.color.b / 255.0f,
+        triangle.v3.color.r / 255.0f,
+        triangle.v3.color.g / 255.0f,
+        triangle.v3.color.b / 255.0f,
     };
 
     glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
@@ -73,21 +85,33 @@ void draw_triangle(Triangle triangle)
 
     GLuint vao = 0;
     GLuint vbo = 0;
+    GLuint color_bo = 0;
+
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
+    glGenBuffers(1, &color_bo);
 
     glBindVertexArray(vao);
 
+    // Send vertices
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
+    // Send colors
+    glBindBuffer(GL_ARRAY_BUFFER, color_bo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
+    glDeleteBuffers(1, &color_bo);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -95,24 +119,24 @@ void draw_triangle(Triangle triangle)
 void draw_quad(Quad quad)
 {
     // Prepare vertices for OpenGL
-    float vertices[] = {
-        (quad.v1.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
-        (quad.v1.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+    float vertices[18] = {
+        quad.v1.position.x / PSX_RT.size.x - 1.0f,
+        1.0f - quad.v1.position.y / PSX_RT.size.y,
         0.0f,
-        (quad.v2.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
-        (quad.v2.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        quad.v2.position.x / PSX_RT.size.x - 1.0f,
+        1.0f - quad.v2.position.y / PSX_RT.size.y,
         0.0f,
-        (quad.v3.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
-        (quad.v3.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        quad.v3.position.x / PSX_RT.size.x - 1.0f,
+        1.0f - quad.v3.position.y / PSX_RT.size.y,
         0.0f,
-        (quad.v2.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
-        (quad.v2.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        quad.v2.position.x / PSX_RT.size.x - 1.0f,
+        1.0f - quad.v2.position.y / PSX_RT.size.y,
         0.0f,
-        (quad.v3.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
-        (quad.v3.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        quad.v3.position.x / PSX_RT.size.x - 1.0f,
+        1.0f - quad.v3.position.y / PSX_RT.size.y,
         0.0f,
-        (quad.v4.position.x * 2.0f) / PSX_RT.size.x - 1.0f,
-        (quad.v4.position.y * 2.0f) / PSX_RT.size.y - 1.0f,
+        quad.v4.position.x / PSX_RT.size.x - 1.0f,
+        1.0f - quad.v4.position.y / PSX_RT.size.y,
         0.0f
     };
 
@@ -179,7 +203,6 @@ static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     frontend_state.window_size.y = height;
 
     glfwSetWindowSize(window, width, height);
-    glViewport(0, 0, width, height);
 }
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -344,7 +367,6 @@ static void resize_framebuffer(RenderTarget* render_target, Vec2 new_size)
     create_framebuffer(render_target);
 }
 
-GLuint vram_texture = 0;
 uint32_t test[VRAM_WIDTH * VRAM_HEIGHT] = {0};
 
 int start_interface()
@@ -361,8 +383,24 @@ int start_interface()
 
 int update_interface()
 {
+    Quad quad = {
+        .v1 = { 0.0f, 0.0f, 255.0f },
+        .v2 = { 200.0f, 0.0f, 255.0f },
+        .v3 = { 0.0f, 200.0f, 255.0f },
+        .v4 = { 200.0f, 200.0f, 255.0f },
+    };
+    draw_quad(quad);
+    
+    Triangle tri = {
+     .v1 = { 0.0f, 0.0f, 0.0f, 255.0f },
+     .v2 = { 240.0f, 0.0f, 0.0f },
+     .v3 = { 240.0f, 240.0f, 0.0f },
+    };
+    draw_triangle(tri);
+
     glBindTexture(GL_TEXTURE_2D, VRAM_RT.render_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, VRAM_WIDTH, VRAM_HEIGHT, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, gpu_state.vram);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     // Blit from PSX framebuffer to window framebuffer
     glBindFramebuffer(GL_READ_FRAMEBUFFER, frontend_state.current_render_target->framebuffer);
@@ -384,8 +422,6 @@ int update_interface()
 
 	if (glfwWindowShouldClose(frontend_state.window))
 		return 1;
-
-    glDeleteTextures(1, &vram_texture);
 
 	return 0;
 }

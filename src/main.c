@@ -13,7 +13,9 @@
 #include "gpu.h"
 
 const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
-const char exe_path[] = "roms/dma/otc-test/otc-test.exe";
+const char exe_path[] = "roms/gpu/triangle/triangle.exe";
+//const char exe_path[] = "roms/gpu/quad/quad.exe";
+//const char exe_path[] = "roms/dma/otc-test/otc-test.exe";
 //const char exe_path[] = "roms/psxtest_cpu.exe";
 
 bool finished_bios_boot = false;
@@ -110,7 +112,7 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	add_breakpoint(0x80012D8C, true, false);
+	//add_breakpoint(0xBFC07028, true, false);
 
 	// Emulation loop
 	while (update_interface() == 0)
