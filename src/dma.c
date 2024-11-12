@@ -188,21 +188,25 @@ static void start_burst_dma(DMAChannel* channel)
 		return;
 	}
 
-	uint32_t address = channel->dma_madr;
+	if (channel->dma_bcr <= 0)
+		return;
+
+	uint32_t address = channel->dma_madr & 0xFFFFFF;
+	int increment = state->madr_increment ? -4 : 4;
+
+	// Then for all the other addresses, create pointer to the previous entry
+	for (int i = 0; i < channel->dma_bcr - 1; i++)
+	{
+		uint32_t previous_address = address;
+		address += increment;
+
+		write_word(previous_address, address & 0xFFFFFF);
+	}
 
 	// Write end node at the first address
 	write_word(address, 0x00FFFFFF);
 
-	// Then for all the other addresses, create pointer to the previous entry
-	while (channel->dma_bcr--)
-	{
-		uint32_t previous_address = address;
-
-		int increment = state->madr_increment ? -4 : 4;
-		address += increment;
-
-		write_word(address, previous_address & 0xFFFFFF);
-	}
+	channel->dma_bcr = 0;
 }
 
 static void start_sliced_dma(DMAChannel* channel)

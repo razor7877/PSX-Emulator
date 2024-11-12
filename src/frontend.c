@@ -57,14 +57,14 @@ void draw_triangle(Triangle triangle)
 {
     // Prepare vertices for OpenGL
     float vertices[9] = {
-        triangle.v1.position.x / PSX_RT.size.x - 1.0f,
-        1.0f - triangle.v1.position.y / PSX_RT.size.y,
+        (triangle.v1.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (triangle.v1.position.y / PSX_RT.size.y) * 2.0f,
         0.0f,
-        triangle.v2.position.x / PSX_RT.size.x - 1.0f,
-        1.0f - triangle.v2.position.y / PSX_RT.size.y,
+        (triangle.v2.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (triangle.v2.position.y / PSX_RT.size.y) * 2.0f,
         0.0f,
-        triangle.v3.position.x / PSX_RT.size.x - 1.0f,
-        1.0f - triangle.v3.position.y / PSX_RT.size.y,
+        (triangle.v3.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (triangle.v3.position.y / PSX_RT.size.y) * 2.0f,
         0.0f
     };
 
@@ -120,23 +120,23 @@ void draw_quad(Quad quad)
 {
     // Prepare vertices for OpenGL
     float vertices[18] = {
-        quad.v1.position.x / PSX_RT.size.x - 1.0f,
-        1.0f - quad.v1.position.y / PSX_RT.size.y,
+        (quad.v1.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v1.position.y / PSX_RT.size.y) * 2.0f,
         0.0f,
-        quad.v2.position.x / PSX_RT.size.x - 1.0f,
-        1.0f - quad.v2.position.y / PSX_RT.size.y,
+        (quad.v2.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v2.position.y / PSX_RT.size.y) * 2.0f,
         0.0f,
-        quad.v3.position.x / PSX_RT.size.x - 1.0f,
-        1.0f - quad.v3.position.y / PSX_RT.size.y,
+        (quad.v3.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v3.position.y / PSX_RT.size.y) * 2.0f,
         0.0f,
-        quad.v2.position.x / PSX_RT.size.x - 1.0f,
-        1.0f - quad.v2.position.y / PSX_RT.size.y,
+        (quad.v2.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v2.position.y / PSX_RT.size.y) * 2.0f,
         0.0f,
-        quad.v3.position.x / PSX_RT.size.x - 1.0f,
-        1.0f - quad.v3.position.y / PSX_RT.size.y,
+        (quad.v3.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v3.position.y / PSX_RT.size.y) * 2.0f,
         0.0f,
-        quad.v4.position.x / PSX_RT.size.x - 1.0f,
-        1.0f - quad.v4.position.y / PSX_RT.size.y,
+        (quad.v4.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
+        1.0f - (quad.v4.position.y / PSX_RT.size.y) * 2.0f,
         0.0f
     };
 
@@ -383,7 +383,7 @@ int start_interface()
 
 int update_interface()
 {
-    Quad quad = {
+    /*Quad quad = {
         .v1 = { 0.0f, 0.0f, 255.0f },
         .v2 = { 200.0f, 0.0f, 255.0f },
         .v3 = { 0.0f, 200.0f, 255.0f },
@@ -396,7 +396,7 @@ int update_interface()
      .v2 = { 240.0f, 0.0f, 0.0f },
      .v3 = { 240.0f, 240.0f, 0.0f },
     };
-    draw_triangle(tri);
+    draw_triangle(tri);*/
 
     glBindTexture(GL_TEXTURE_2D, VRAM_RT.render_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, VRAM_WIDTH, VRAM_HEIGHT, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, gpu_state.vram);

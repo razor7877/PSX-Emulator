@@ -162,7 +162,7 @@ static void gp0_misc(uint32_t value)
 	}
 	else if (gpu_state.current_gp0_command == GP0_CPU_TO_VRAM_BLIT)
 	{
-		log_info("Received parameter for CPU to VRAM blit command index %d\n", gpu_state.command_buffer_index);
+		//log_info("Received parameter for CPU to VRAM blit command index %d\n", gpu_state.command_buffer_index);
 		gpu_state.command_buffer[gpu_state.command_buffer_index] = value;
 		gpu_state.command_buffer_index++;
 		
@@ -256,9 +256,9 @@ static void gp0_misc(uint32_t value)
 					else
 						color = command_value;
 
-					colors[i * 3 + 2] = (color & 0x0000FF); // B
+					colors[i * 3] = (color & 0x0000FF); // B
 					colors[i * 3 + 1] = (color & 0x00FF00) >> 8; // G
-					colors[i * 3] = (color & 0xFF0000) >> 16; // R
+					colors[i * 3 + 2] = (color & 0xFF0000) >> 16; // R
 				}
 
 				Triangle triangle = {
@@ -289,9 +289,9 @@ static void gp0_misc(uint32_t value)
 					else
 						color = command_value;
 
-					colors[i * 3 + 2] = (color & 0x0000FF); // B
+					colors[i * 3] = (color & 0x0000FF); // B
 					colors[i * 3 + 1] = (color & 0x00FF00) >> 8; // G
-					colors[i * 3] = (color & 0xFF0000) >> 16; // R
+					colors[i * 3 + 2] = (color & 0xFF0000) >> 16; // R
 				}
 
 				Quad quad = {
@@ -337,7 +337,7 @@ static void handle_gp0_command(uint32_t value)
 
 		gpu_state.blit_destination_address += 2;
 
-		log_info("Consuming CPU to VRAM data... Got %x value stored at %x and %x, We still need %d words\n", value, mapped_address, mapped_address + 1, gpu_state.blit_words_remaining);
+		//log_info("Consuming CPU to VRAM data... Got %x value stored at %x and %x, We still need %d words\n", value, mapped_address, mapped_address + 1, gpu_state.blit_words_remaining);
 
 		if (gpu_state.blit_words_remaining == 0)
 			finish_gp0_command();
@@ -414,7 +414,6 @@ static inline Vec2 get_screen_resolution(DisplayMode display_mode)
 	// Vertical resolution is 240px unless v_res bit is set & vertical interlace is on
 	if (display_mode.v_res & display_mode.use_vertical_interlace)
 		fbo_v_res = 480;
-
 	Vec2 new_size = {
 		.x = fbo_h_res,
 		.y = fbo_v_res,
