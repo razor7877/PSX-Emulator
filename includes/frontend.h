@@ -64,7 +64,9 @@ typedef struct
 {
 	GLFWwindow* window;
 	GLuint solid_shader;
+	RenderTarget* current_render_target;
 	RenderTarget psx_render_target;
+	RenderTarget vram_render_target;
 	Vec2 window_size;
 } Frontend;
 
@@ -79,16 +81,21 @@ extern Frontend frontend_state;
 /// <param name="green">The green color value</param>
 /// <param name="blue">The blue color value</param>
 void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, uint8_t blue);
-
 void draw_triangle(Triangle triangle);
-
 void draw_quad(Quad quad);
+
+static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+static int setup_glfw();
+static void compile_shaders();
+static void create_framebuffer(RenderTarget* render_target);
 
 /// <summary>
 /// Resizes the PSX framebuffer
 /// </summary>
 /// <param name="new_size">The new size for the PSX framebuffer</param>
 void resize_psx_framebuffer(Vec2 new_size);
+static void resize_framebuffer(RenderTarget* render_target, Vec2 new_size);
 
 /// <summary>
 /// Starts the frontend

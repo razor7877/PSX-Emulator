@@ -1,29 +1,42 @@
 #include <stdbool.h>
+#include <string.h>
 
 #include "frontend.h"
 #include "logging.h"
 #include "debug.h"
-#include <gpu.h>
+#include "gpu.h"
 
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
 
+#define VRAM_WIDTH 512
+#define VRAM_HEIGHT 1024
+
 #define PSX_RT frontend_state.psx_render_target
+#define VRAM_RT frontend_state.vram_render_target
 
 Frontend frontend_state = {
 	.window = NULL,
     .solid_shader = 0,
-    .window_size = {
-        .x = WINDOW_WIDTH,
-        .y = WINDOW_HEIGHT,
-    },
+    .current_render_target = &frontend_state.psx_render_target,
     .psx_render_target = {
         .framebuffer = 0,
         .depth_stencil_buffer = 0,
         .render_texture = 0,
         .draw_buffer = 0,
         .size = { 512, 240 },
-    }
+    },
+    .vram_render_target = {
+        .framebuffer = 0,
+        .depth_stencil_buffer = 0,
+        .render_texture = 0,
+        .draw_buffer = 0,
+        .size = { VRAM_WIDTH, VRAM_HEIGHT },
+    },
+    .window_size = {
+        .x = WINDOW_WIDTH,
+        .y = WINDOW_HEIGHT,
+    },
 };
 
 void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, uint8_t blue)
@@ -173,6 +186,14 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
     if (action == GLFW_PRESS && key == GLFW_KEY_SPACE)
         debug_state.in_debug = !debug_state.in_debug;
+
+    if (action == GLFW_PRESS && key == GLFW_KEY_V)
+    {
+        if (frontend_state.current_render_target == &frontend_state.psx_render_target)
+            frontend_state.current_render_target = &frontend_state.vram_render_target;
+        else
+            frontend_state.current_render_target = &frontend_state.psx_render_target;
+    }
 }
 
 static int setup_glfw()
@@ -274,30 +295,30 @@ static void compile_shaders()
     glDeleteShader(fragment);
 }
 
-static void create_psx_framebuffer()
+static void create_framebuffer(RenderTarget* render_target)
 {
-    glGenFramebuffers(1, &PSX_RT.framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
+    glGenFramebuffers(1, &render_target->framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, render_target->framebuffer);
 
     // Depth buffer for the FBO
-    glGenRenderbuffers(1, &PSX_RT.depth_stencil_buffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, PSX_RT.depth_stencil_buffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, PSX_RT.size.x, PSX_RT.size.y);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, PSX_RT.depth_stencil_buffer);
+    glGenRenderbuffers(1, &render_target->depth_stencil_buffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, render_target->depth_stencil_buffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, render_target->size.x, render_target->size.y);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, render_target->depth_stencil_buffer);
 
     // Render texture for the framebuffer
-    glGenTextures(1, &PSX_RT.render_texture);
-    glBindTexture(GL_TEXTURE_2D, PSX_RT.render_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, PSX_RT.size.x, PSX_RT.size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glGenTextures(1, &render_target->render_texture);
+    glBindTexture(GL_TEXTURE_2D, render_target->render_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, render_target->size.x, render_target->size.y, 0, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, 0);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     // Set texture as color attachment 0
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, PSX_RT.render_texture, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, render_target->render_texture, 0);
 
-    PSX_RT.draw_buffer = GL_COLOR_ATTACHMENT0;
-    glDrawBuffers(1, &PSX_RT.draw_buffer);
+    render_target->draw_buffer = GL_COLOR_ATTACHMENT0;
+    glDrawBuffers(1, &render_target->draw_buffer);
 
     // Unbind the framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -305,22 +326,26 @@ static void create_psx_framebuffer()
 
 void resize_psx_framebuffer(Vec2 new_size)
 {
-    PSX_RT.size = new_size;
+    resize_framebuffer(&PSX_RT, new_size);
+}
+
+static void resize_framebuffer(RenderTarget* render_target, Vec2 new_size)
+{
+    render_target->size = new_size;
     
-    glDeleteFramebuffers(1, &PSX_RT.framebuffer);
-    glDeleteRenderbuffers(1, &PSX_RT.depth_stencil_buffer);
-    glDeleteTextures(1, &PSX_RT.render_texture);
+    glDeleteFramebuffers(1, &render_target->framebuffer);
+    glDeleteRenderbuffers(1, &render_target->depth_stencil_buffer);
+    glDeleteTextures(1, &render_target->render_texture);
 
-    PSX_RT.framebuffer = 0;
-    PSX_RT.depth_stencil_buffer = 0;
-    PSX_RT.render_texture = 0;
+    render_target->framebuffer = 0;
+    render_target->depth_stencil_buffer = 0;
+    render_target->render_texture = 0;
 
-    create_psx_framebuffer();
-
-    //log_debug("PSX Framebuffer was resized! New size is %f by %f\n", new_size.x, new_size.y);
+    create_framebuffer(render_target);
 }
 
 GLuint vram_texture = 0;
+uint32_t test[VRAM_WIDTH * VRAM_HEIGHT] = {0};
 
 int start_interface()
 {
@@ -328,33 +353,26 @@ int start_interface()
 		return -1;
 
     compile_shaders();
-    create_psx_framebuffer();
+    create_framebuffer(&PSX_RT);
+    create_framebuffer(&VRAM_RT);
 
-    glGenTextures(1, &vram_texture);
-    glBindTexture(GL_TEXTURE_2D, vram_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB5_A1, 512, 2048, 0, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
 	return 0;
 }
 
-uint16_t test[524288] = { 0xFFFF };
-
 int update_interface()
 {
+    glBindTexture(GL_TEXTURE_2D, VRAM_RT.render_texture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, VRAM_WIDTH, VRAM_HEIGHT, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, gpu_state.vram);
+
     // Blit from PSX framebuffer to window framebuffer
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, PSX_RT.framebuffer);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, frontend_state.current_render_target->framebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
-    Vec2 src_size = PSX_RT.size;
+    Vec2 src_size = frontend_state.current_render_target->size;
     Vec2 tgt_size = frontend_state.window_size;
 
     glScissor(0, 0, src_size.x, src_size.y);
     glBlitFramebuffer(0, 0, src_size.x, src_size.y, 0, 0, tgt_size.x, tgt_size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-    glBindTexture(GL_TEXTURE_2D, vram_texture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 512, 2048, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, test);
-    glBindTexture(GL_TEXTURE_2D, 0);
 
     int glError = glGetError();
     if (glError != 0)

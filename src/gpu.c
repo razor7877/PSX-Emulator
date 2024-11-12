@@ -3,6 +3,7 @@
 #include "gpu.h"
 #include "logging.h"
 #include "cpu.h"
+#include "memory.h"
 
 GPU gpu_state = {
 	.gpu_read = 0,
@@ -24,7 +25,7 @@ GPU gpu_state = {
 	.display_area_start = 0,
 	.display_range_horizontal = 0,
 	.display_range_vertical = 0,
-	.vram = { 0xF800 },
+	.vram = {0},
 };
 
 uint32_t read_gpu(uint32_t address)
@@ -167,13 +168,19 @@ static void gp0_misc(uint32_t value)
 		
 		if (gpu_state.command_buffer_index >= 3)
 		{
-			uint16_t x_pos = gpu_state.command_buffer[1] & 0xFFFF;
-			uint16_t y_pos = (gpu_state.command_buffer[1] & 0xFFFF0000) >> 16;
+			uint16_t x_pos = gpu_state.command_buffer[1] & 0x3FF;
+			uint16_t y_pos = (gpu_state.command_buffer[1] & 0x1FF0000) >> 16;
 
 			uint16_t x_size = gpu_state.command_buffer[2] & 0xFFFF;
 			uint16_t y_size = (gpu_state.command_buffer[2] & 0xFFFF0000) >> 16;
 
-			int word_count = x_size * y_size;
+			x_size = ((x_size - 1) & 0x3FF) + 1;
+			y_size = ((y_size - 1) & 0x1FF) + 1;
+
+			int word_count = ((x_size * y_size) + 1) & 0xFFFFFFFE;
+
+			// VRAM is laid out as 512 lines of 2048 bytes / 1024 half words
+			int dest_location = y_pos * 1024 + x_pos;
 
 			log_info("Starting CPU to VRAM blit -- dest is %x %x -- size is %x %x (%x)\n",
 				x_pos, y_pos,
@@ -183,9 +190,6 @@ static void gp0_misc(uint32_t value)
 
 			// Round up if we have an uneven number of pixels, since we send 2 words at a time
 			word_count = (word_count + 1) & ~1;
-
-			// VRAM is laid out as 512 lines of 2048 bytes / 4096 half words
-			int dest_location = y_pos * 4096 + x_pos;
 
 			gpu_state.blit_words_remaining = word_count / 2;
 			gpu_state.blit_destination_address = dest_location;
@@ -260,9 +264,9 @@ static void gp0_misc(uint32_t value)
 					if (!is_gouraud_shading)
 					{
 						// Get color from first vertex when using flat shading
-						colors[i * 3 + 2] = (command_value & 0x0000FF); // B
-						colors[i * 3 + 1] = (command_value & 0x00FF00) >> 8; // G
-						colors[i * 3] = (command_value & 0xFF0000) >> 16; // R
+						colors[i * 3 + 2] = (command_value & 0x0000FF) << 2; // B
+						colors[i * 3 + 1] = (command_value & 0x00FF00) >> 6; // G
+						colors[i * 3] = (command_value & 0xFF0000) >> 14; // R
 					}
 				}
 
@@ -299,7 +303,6 @@ static void handle_gp0_command(uint32_t value)
 	// If we are running a CPU to VRAM blit, consume the command instead as data
 	if (gpu_state.blit_words_remaining)
 	{
-		//log_info("Consuming CPU to VRAM data... Got %x value, We still need %d words\n", value, gpu_state.blit_words_remaining);
 		gpu_state.blit_words_remaining--;
 
 		uint16_t mapped_address = gpu_state.blit_destination_address / HALF_WORD_SIZE;
@@ -308,6 +311,8 @@ static void handle_gp0_command(uint32_t value)
 		gpu_state.vram[mapped_address + 1] = (value & 0xFFFF0000) >> 16;
 
 		gpu_state.blit_destination_address += 2;
+
+		log_info("Consuming CPU to VRAM data... Got %x value stored at %x and %x, We still need %d words\n", value, mapped_address, mapped_address + 1, gpu_state.blit_words_remaining);
 
 		if (gpu_state.blit_words_remaining == 0)
 			finish_gp0_command();
