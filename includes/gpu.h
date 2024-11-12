@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #include "frontend.h"
-#include <memory.h>
+#include "memory.h"
 
 /// <summary>
 /// The possible GP0 commands
@@ -98,20 +98,6 @@ typedef enum
 	COLOR_24_BITS = 1,
 } DisplayColorDepth;
 
-/// <summary>
-/// Display mode state - GP1(0x08)
-/// </summary>
-typedef struct
-{
-	HorizontalRes1 h_res_1;
-	HorizontalRes2 h_res_2;
-	VerticalRes v_res;
-	VideoMode video_mode;
-	DisplayColorDepth color_depth;
-	bool use_vertical_interlace;
-	bool flip_screen_horizontal;
-} DisplayMode;
-
 typedef enum
 {
 	PAGE_4_BIT,
@@ -127,6 +113,20 @@ typedef enum
 	DMA_DIR_CPU_TO_GP0 = 2,
 	DMA_DIR_GPUREAD_TO_CPU = 3,
 } DMADirection;
+
+/// <summary>
+/// Display mode state - GP1(0x08)
+/// </summary>
+typedef struct
+{
+	HorizontalRes1 h_res_1;
+	HorizontalRes2 h_res_2;
+	VerticalRes v_res;
+	VideoMode video_mode;
+	DisplayColorDepth color_depth;
+	bool use_vertical_interlace;
+	bool flip_screen_horizontal;
+} DisplayMode;
 
 /// <summary>
 /// All the parameters of the GPUSTAT registers
@@ -197,12 +197,24 @@ typedef struct
 	/// </summary>
 	int blit_words_remaining;
 
+	/// <summary>
+	/// The size of the rectangle for the current CPU to VRAM blit transfer
+	/// </summary>
 	iVec2 blit_size;
 
+	/// <summary>
+	/// The position of the rectangle (top left corner) for the current CPU to VRAM blit transfer
+	/// </summary>
 	iVec2 blit_position;
 
+	/// <summary>
+	/// The current x position in the rectangle for the current CPU to VRAM blit transfer
+	/// </summary>
 	int blit_x_count;
 
+	/// <summary>
+	/// The current y position in the rectangle for the current CPU to VRAM blit transfer
+	/// </summary>
 	int blit_y_count;
 
 	/// <summary>

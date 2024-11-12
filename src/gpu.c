@@ -1,5 +1,4 @@
-#include <string.h>
-
+#include "frontend.h"
 #include "gpu.h"
 #include "logging.h"
 #include "cpu.h"
@@ -60,7 +59,6 @@ static void gp0_env(uint32_t value)
 	switch (env_command)
 	{
 		case 0x01:
-			//log_debug("GP0(0xE1) - Draw mode settings\n");
 			gpu_state.gpu_status.texture_page_x_base = value & 0b1111;
 			gpu_state.gpu_status.texture_page_y_base_1 = (value & (1 << 4)) >> 4;
 			gpu_state.gpu_status.semi_transparency = (value & (0b11 << 5)) >> 5;
@@ -215,7 +213,7 @@ static void gp0_misc(uint32_t value)
 		// Raw texture or modulation
 		bool use_raw_texture = (command_value & (1 << 24)) >> 24;
 
-		int vertices = is_rectangle ? 4 : 3;
+		int vertices_count = is_rectangle ? 4 : 3;
 		int vertex_word_size = 1;
 
 		if (is_gouraud_shading)
@@ -224,7 +222,7 @@ static void gp0_misc(uint32_t value)
 			vertex_word_size++;
 
 		// The polygon command will take up to 12 words + 1 for the command itself
-		int total_cmd_size = vertices * vertex_word_size + 1;
+		int total_cmd_size = vertices_count * vertex_word_size + 1;
 		// Substract one since the first color is in the command value when using Gouraud shading
 		total_cmd_size -= is_gouraud_shading;
 
@@ -243,70 +241,80 @@ static void gp0_misc(uint32_t value)
 				uv_offset++;
 			}
 
-			if (!is_rectangle)
+			Vec2 positions[4] = {0};
+			Vec3 colors[4] = {0};
+			Vec2 uv_coords[4] = {0};
+			UVData uv_data;
+
+			uint16_t clut_index = 0;
+			uint16_t texture_page_info = 0;
+
+			if (is_textured)
 			{
-				float vertices[6] = {0};
-				float colors[9] = { 0 };
+				// One word of UV data per vertex, the first vertex also contains the CLUT index
+				clut_index = (gpu_state.command_buffer[1 + uv_offset] & 0xFFFF0000) >> 16;
+				// One word of UV data per vertex, the first vertex also contains the texture page data
+				texture_page_info = (gpu_state.command_buffer[1 + vertex_word_size + uv_offset] & 0xFFFF0000) >> 16;
 
-				for (int i = 0; i < 3; i++)
-				{
-					// Multiply by vertex_word_size to get the correct stride
-					uint32_t xy_pos = gpu_state.command_buffer[1 + i * vertex_word_size + vertex_offset];
-					vertices[i * 2] = (int16_t)(xy_pos & 0xFFFF);
-					vertices[i * 2 + 1] = (int16_t)((xy_pos & 0xFFFF0000) >> 16);
-
-					uint32_t color;
-					if (is_gouraud_shading)
-						color = gpu_state.command_buffer[1 + i * vertex_word_size + color_offset];
-					else
-						color = command_value;
-
-					colors[i * 3] = (color & 0x0000FF); // B
-					colors[i * 3 + 1] = (color & 0x00FF00) >> 8; // G
-					colors[i * 3 + 2] = (color & 0xFF0000) >> 16; // R
-				}
-
-				Triangle triangle = {
-					.v1 = { vertices[0], vertices[1], colors[0], colors[1], colors[2] },
-					.v2 = { vertices[2], vertices[3], colors[3], colors[4], colors[5] },
-					.v3 = { vertices[4], vertices[5], colors[6], colors[7], colors[8] },
-				};
-
-				draw_triangle(triangle);
+				// x coord in 16 halfword steps
+				uv_data.clut_position.x = clut_index & 0b111111;
+				// y coord in line steps
+				uv_data.clut_position.y = (clut_index & (0b111111111 << 6)) >> 6;
+				uv_data.texture_page_x_base = texture_page_info & 0b1111;
+				uv_data.texture_page_y_base = (texture_page_info & (1 << 4)) >> 4;
+				uv_data.semi_transparency = (texture_page_info & (0b11 << 5)) >> 5;
+				uv_data.texture_page_colors = (texture_page_info & (0b11 << 7)) >> 7;
 			}
-			else
+
+			// For each vertex, we construct the position and color data
+			for (int i = 0; i < vertices_count; i++)
 			{
-				// 4 vertices with two coordinates each
-				float vertices[8] = {0};
-				// 4 vertices with 3 colors each
-				float colors[12] = {0};
+				// Multiply by vertex_word_size to get the correct stride
+				uint32_t xy_pos = gpu_state.command_buffer[1 + i * vertex_word_size + vertex_offset];
+				positions[i].x = (int16_t)(xy_pos & 0xFFFF);
+				positions[i].y = (int16_t)((xy_pos & 0xFFFF0000) >> 16);
 
-				for (int i = 0; i < 4; i++)
+				uint32_t color;
+				if (is_gouraud_shading)
+					color = gpu_state.command_buffer[1 + i * vertex_word_size + color_offset];
+				else
+					color = command_value;
+
+				colors[i].b = (color & 0x0000FF); // B
+				colors[i].g = (color & 0x00FF00) >> 8; // G
+				colors[i].r = (color & 0xFF0000) >> 16; // R
+
+				if (is_textured)
 				{
-					// Multiply by vertex_word_size to get the correct stride
-					uint32_t xy_pos = gpu_state.command_buffer[1 + i * vertex_word_size + vertex_offset];
-					vertices[i * 2] = (int16_t)(xy_pos & 0xFFFF);
-					vertices[i * 2 + 1] = (int16_t)((xy_pos & 0xFFFF0000) >> 16);
+					uint32_t uv = 1 + i * vertex_word_size + uv_offset;
 
-					uint32_t color;
-					if (is_gouraud_shading)
-						color = gpu_state.command_buffer[1 + i * vertex_word_size + color_offset];
-					else
-						color = command_value;
-
-					colors[i * 3] = (color & 0x0000FF); // B
-					colors[i * 3 + 1] = (color & 0x00FF00) >> 8; // G
-					colors[i * 3 + 2] = (color & 0xFF0000) >> 16; // R
+					uv_coords[i].x = uv & 0xFF;
+					uv_coords[i].y = (uv & 0xFF00) >> 8;
 				}
+			}
 
+			if (is_rectangle)
+			{
 				Quad quad = {
-					.v1 = { vertices[0], vertices[1], colors[0], colors[1], colors[2] },
-					.v2 = { vertices[2], vertices[3], colors[3], colors[4], colors[5] },
-					.v3 = { vertices[4], vertices[5], colors[6], colors[7], colors[8] },
-					.v4 = { vertices[6], vertices[7], colors[9], colors[10], colors[11] },
+					.v1 = { positions[0], colors[0] },
+					.v2 = { positions[1], colors[1] },
+					.v3 = { positions[2], colors[2] },
+					.v4 = { positions[3], colors[3] },
+					.uv_data = uv_data,
 				};
 
 				draw_quad(quad);
+			}
+			else
+			{
+				Triangle triangle = {
+					.v1 = { positions[0], colors[0] },
+					.v2 = { positions[1], colors[1] },
+					.v3 = { positions[2], colors[2] },
+					.uv_data = uv_data,
+				};
+
+				draw_triangle(triangle);
 			}
 
 			finish_gp0_command();
