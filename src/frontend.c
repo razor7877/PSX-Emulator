@@ -53,9 +53,17 @@ const char* texture_f_shader =
     "in vec2 texCoord;"
     "out vec4 FragColor;"
     "uniform sampler2D textureSampler;"
+    "uniform sampler1D clutSampler;"
+    "uniform int clutSize;"
     "void main()"
     "{"
-    "   FragColor = texture(textureSampler, texCoord);"
+    "   if (clutSize == 0)"
+    "       FragColor = texture(textureSampler, texCoord);"
+    "   else"
+    "   {"
+    "       float clutIndex = texture(textureSampler, texCoord).r;"
+    "       FragColor = texture(clutSampler, clutIndex);"
+    "   }"
     "}";
 
 // Blit to quad shader
@@ -310,17 +318,14 @@ void draw_textured_quad(Quad quad)
         quad.v4.uv.y / 255.0f,
     };
 
-    // x in 16 halfword steps, y in 1 line steps
-    // Get CLUT address in VRAM
-    uint32_t clut_start = quad.uv_data.clut_position.y * 1024 + quad.uv_data.clut_position.x * 16;
-
     uint8_t texture_data[256 * 256 * 3] = {0};
 
     uint32_t x_start = quad.uv_data.texture_page_x_base * 64;
-    uint32_t y_start = quad.uv_data.texture_page_y_base * 256;;
+    uint32_t y_start = quad.uv_data.texture_page_y_base * 256;
 
     TexturePageColors colors = quad.uv_data.texture_page_colors;
 
+    // Generate the 256*256 texture page to send to the GPU
     if (colors == PAGE_4_BIT)
     {
         for (int y = 0; y < 256; y++)
@@ -330,17 +335,31 @@ void draw_textured_quad(Quad quad)
                 uint32_t pixel_address = (y_start + y) * 1024 + (x_start + x / 4);
                 uint16_t pixel = gpu_state.vram[pixel_address];
 
-                uint16_t mask = 0xF << ((3 - x % 4) * 4);
+                int pixel_index = x % 4;
+                uint16_t mask = 0xF000 >> (3 - x % 4) * 4;
 
-                texture_data[3 * 256 * y + 3 * x] = (pixel & mask) >> ((x % 4) * 4);
-                texture_data[3 * 256 * y + 3 * x + 1] = (pixel & mask) >> ((x % 4) * 4);
-                texture_data[3 * 256 * y + 3 * x + 2] = (pixel & mask) >> ((x % 4) * 4);
+                texture_data[3 * 256 * y + 3 * x] = (pixel & mask) >> (pixel_index * 4) << 4;
+                texture_data[3 * 256 * y + 3 * x + 1] = (pixel & mask) >> (pixel_index * 4) << 4;
+                texture_data[3 * 256 * y + 3 * x + 2] = (pixel & mask) >> (pixel_index * 4) << 4;
             }
         }
     }
     else if (colors == PAGE_8_BIT)
     {
+        for (int y = 0; y < 256; y++)
+        {
+            for (int x = 0; x < 256; x++)
+            {
+                uint32_t pixel_address = (y_start + y) * 1024 + (x_start + x / 2);
+                uint16_t pixel = gpu_state.vram[pixel_address];
 
+                uint16_t mask = 0xFF << ((1 - x % 2) * 8);
+
+                texture_data[3 * 256 * y + 3 * x] = (pixel & mask) >> ((x % 2) * 8);
+                texture_data[3 * 256 * y + 3 * x + 1] = (pixel & mask) >> ((x % 2) * 8);
+                texture_data[3 * 256 * y + 3 * x + 2] = (pixel & mask) >> ((x % 2) * 8);
+            }
+        }
     }
     else if (colors == PAGE_15_BIT)
     {
@@ -358,8 +377,38 @@ void draw_textured_quad(Quad quad)
         }
     }
 
+    // x in 16 halfword steps, y in 1 line steps
+    // Get CLUT address in VRAM
+    uint32_t clut_start = quad.uv_data.clut_position.y * 1024 + quad.uv_data.clut_position.x * 16;
+
+    // CLUT is 256x1 or 16x1 depending on color mode
+    uint8_t clut_data[256 * 1 * 3] = {0};
+    int clut_size = 0;
+
+    if (colors == PAGE_4_BIT)
+        clut_size = 16;
+    else if (colors == PAGE_8_BIT)
+        clut_size = 256;
+
+    if (clut_size != 0)
+    {
+        for (int i = 0; i < clut_size; i++)
+        {
+            uint32_t clut_color = gpu_state.vram[clut_start + i];
+
+            clut_data[i * 3] = clut_color & 0b11111;
+            clut_data[i * 3 + 1] = (clut_color & (0b11111 << 5)) >> 5;
+            clut_data[i * 3 + 2] = (clut_color & (0b11111 << 10)) >> 10;
+
+            clut_data[i * 3] <<= 3;
+            clut_data[i * 3 + 1] <<= 3;
+            clut_data[i * 3 + 2] <<= 3;
+        }
+    }
+
     GLuint texture = 0;
-    
+    GLuint clut_texture = 0;
+
     // Create a texture with the texture page data
     glGenTextures(1, &texture);
     glActiveTexture(GL_TEXTURE0);
@@ -369,13 +418,26 @@ void draw_textured_quad(Quad quad)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
+    // If we need a CLUT, create a 1D texture for it
+    if (clut_size != 0)
+    {
+        glGenTextures(1, &clut_texture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_1D, clut_texture);
+        glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB, clut_size, 0, GL_RGB, GL_UNSIGNED_BYTE, clut_data);
+
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    }
+
     glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
     glViewport(0, 0, frontend_state.psx_render_target.size.x, frontend_state.psx_render_target.size.y);
     glUseProgram(frontend_state.texture_shader);
 
     // Set the sampler on texture unit 0
     glUniform1i(glGetUniformLocation(frontend_state.texture_shader, "textureSampler"), 0);
-    glUniform1i(glGetUniformLocation(frontend_state.texture_shader, "bitsPerPixel"), 0);
+    glUniform1i(glGetUniformLocation(frontend_state.texture_shader, "clutSampler"), 1);
+    glUniform1i(glGetUniformLocation(frontend_state.texture_shader, "clutSize"), clut_size);
 
     GLuint vao = 0;
     GLuint vbo = 0;
