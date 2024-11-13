@@ -1,8 +1,10 @@
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "interrupt.h"
 #include "cpu.h"
 #include "logging.h"
+#include "coprocessor.h"
 
 InterruptState interrupt_regs = {
 	.I_STAT = 0,
@@ -50,10 +52,37 @@ void write_interrupt_control(uint32_t address, uint32_t value)
 
 void request_interrupt(IRQ_MASK irq)
 {
-	log_warning("Got an IRQ with flag %x\n", irq);
+	log_debug("Got an IRQ with flag %x\n", irq);
+	uint32_t mask = 1 << irq;
+	interrupt_regs.I_STAT |= mask;
 }
 
 void service_interrupts()
 {
+	for (int i = 0; i < 11; i++)
+	{
+		uint32_t mask = 1 << i;
 
+		uint32_t i_mask_val = (interrupt_regs.I_MASK & mask) >> i;
+		uint32_t i_stat_val = (interrupt_regs.I_STAT & mask) >> i;
+
+		if (i_mask_val && i_stat_val)
+		{
+			log_debug("Got IRQ to service with flag %x!\n", i);
+			// Set cop0r13 to request an IRQ to the coprocessor
+			CPR0(13) |= 1 << 10;
+			// Clear I_STAT bit
+			interrupt_regs.I_STAT &= ~mask;
+		}
+	}
+
+	bool im = CPR0(13) & (0b11111111 << 8);
+	bool ip = CPR0(12) & (0b11111111 << 8);
+	bool interrupt_enable = CPR0(12) & 0b1;
+
+	if (interrupt_enable && ip && im)
+	{
+		CPR0(13) &= ~(0b11111111 << 8);
+		handle_exception(INTERRUPT);
+	}
 }

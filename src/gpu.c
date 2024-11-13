@@ -409,7 +409,7 @@ static void handle_gp0_command(uint32_t value)
 
 		case GP0_POLYGON:
 			start_gp0_command(value, GP0_POLYGON);
-			log_info("GP0 command is %x\n", value);
+			//log_info("GP0 command is %x\n", value);
 			break;
 
 		case GP0_LINE:

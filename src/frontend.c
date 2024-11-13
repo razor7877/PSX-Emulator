@@ -62,7 +62,11 @@ const char* texture_f_shader =
     "   else"
     "   {"
     "       float clutIndex = texture(textureSampler, texCoord).r;"
-    "       FragColor = texture(clutSampler, clutIndex);"
+    "       vec3 pixelColor = texture(clutSampler, clutIndex).rgb;"
+    "       float opacity = 1.0f;"
+    "       if (pixelColor.r == 0.0f && pixelColor.g == 0.0f && pixelColor.b == 0.0f)"
+    "           opacity = 0.0f;"
+    "       FragColor = vec4(pixelColor, opacity);"
     "   }"
     "}";
 
@@ -85,7 +89,7 @@ const char* blit_f_shader =
     "uniform sampler2D textureSampler;"
     "void main()"
     "{"
-    "   FragColor = texture(textureSampler, texCoord);"
+    "   FragColor = vec4(texture(textureSampler, texCoord).rgb, 1.0);"
     "}";
 
 Frontend frontend_state = {
@@ -282,6 +286,8 @@ void draw_quad(Quad quad)
 void draw_textured_quad(Quad quad)
 {
     // Prepare vertices for OpenGL
+    // Invert y coordinate to match with OpenGL coordinate system
+    // And convert values from pixel positions to NDC range
     float vertices[18] = {
         (quad.v1.position.x / PSX_RT.size.x) * 2.0f - 1.0f,
         1.0f - (quad.v1.position.y / PSX_RT.size.y) * 2.0f,
@@ -303,6 +309,7 @@ void draw_textured_quad(Quad quad)
         0.0f
     };
     
+    // Convert UV coordinates from 0-255 to 0.0-1.0
     float uv[12] = {
         quad.v1.uv.x / 255.0f,
         quad.v1.uv.y / 255.0f,
@@ -328,16 +335,20 @@ void draw_textured_quad(Quad quad)
     // Generate the 256*256 texture page to send to the GPU
     if (colors == PAGE_4_BIT)
     {
-        for (int y = 0; y < 256; y++)
+        for (int y = 0; y < 256; y++) // For each line
         {
-            for (int x = 0; x < 256; x++)
+            for (int x = 0; x < 256; x++) // For each pixel on the line
             {
+                // Get the address of the current pixel
                 uint32_t pixel_address = (y_start + y) * 1024 + (x_start + x / 4);
                 uint16_t pixel = gpu_state.vram[pixel_address];
 
+                // In 4 bit mode, a half word contains 4 pixel
                 int pixel_index = x % 4;
+                // Mask to select onl the current pixel
                 uint16_t mask = 0xF000 >> (3 - x % 4) * 4;
 
+                // Mask the value, bring it down to a 4 bit value, then left shift by 4 to get an 8 bit color
                 texture_data[3 * 256 * y + 3 * x] = (pixel & mask) >> (pixel_index * 4) << 4;
                 texture_data[3 * 256 * y + 3 * x + 1] = (pixel & mask) >> (pixel_index * 4) << 4;
                 texture_data[3 * 256 * y + 3 * x + 2] = (pixel & mask) >> (pixel_index * 4) << 4;
@@ -346,35 +357,11 @@ void draw_textured_quad(Quad quad)
     }
     else if (colors == PAGE_8_BIT)
     {
-        for (int y = 0; y < 256; y++)
-        {
-            for (int x = 0; x < 256; x++)
-            {
-                uint32_t pixel_address = (y_start + y) * 1024 + (x_start + x / 2);
-                uint16_t pixel = gpu_state.vram[pixel_address];
-
-                uint16_t mask = 0xFF << ((1 - x % 2) * 8);
-
-                texture_data[3 * 256 * y + 3 * x] = (pixel & mask) >> ((x % 2) * 8);
-                texture_data[3 * 256 * y + 3 * x + 1] = (pixel & mask) >> ((x % 2) * 8);
-                texture_data[3 * 256 * y + 3 * x + 2] = (pixel & mask) >> ((x % 2) * 8);
-            }
-        }
+        log_warning("Unhandled 8 bit texture page rendering!\n");
     }
     else if (colors == PAGE_15_BIT)
     {
-        for (int y = 0; y < 256; y++)
-        {
-            for (int x = 0; x < 256; x++)
-            {
-                uint32_t pixel_address = (y_start + y) * 1024 + x_start + x;
-                uint16_t pixel = gpu_state.vram[pixel_address];
-
-                texture_data[3 * 256 * y + 3 * x] = pixel;
-                texture_data[3 * 256 * y + 3 * x + 1] = pixel;
-                texture_data[3 * 256 * y + 3 * x + 2] = pixel;
-            }
-        }
+        log_warning("Unhandled 15 bit texture page rendering!\n");
     }
 
     // x in 16 halfword steps, y in 1 line steps
@@ -390,6 +377,7 @@ void draw_textured_quad(Quad quad)
     else if (colors == PAGE_8_BIT)
         clut_size = 256;
 
+    // If we have a CLUT, we need to construct the array for it
     if (clut_size != 0)
     {
         for (int i = 0; i < clut_size; i++)
@@ -400,6 +388,7 @@ void draw_textured_quad(Quad quad)
             clut_data[i * 3 + 1] = (clut_color & (0b11111 << 5)) >> 5;
             clut_data[i * 3 + 2] = (clut_color & (0b11111 << 10)) >> 10;
 
+            // Convert from 5 to 8 bit color
             clut_data[i * 3] <<= 3;
             clut_data[i * 3 + 1] <<= 3;
             clut_data[i * 3 + 2] <<= 3;
@@ -468,7 +457,9 @@ void draw_textured_quad(Quad quad)
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
     glDeleteBuffers(1, &texture_bo);
+
     glDeleteTextures(1, &texture);
+    glDeleteTextures(1, &clut_texture);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -686,6 +677,9 @@ int start_interface()
 {
 	if (setup_glfw() != 0)
 		return -1;
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     frontend_state.color_shader = compile_shader(color_v_shader, color_f_shader);
     frontend_state.texture_shader = compile_shader(texture_v_shader, texture_f_shader);

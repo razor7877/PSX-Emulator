@@ -11,10 +11,11 @@
 #include "frontend.h"
 #include "logging.h"
 #include "gpu.h"
+#include "interrupt.h"
 
 const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
-const char exe_path[] = "roms/gpu/triangle/triangle.exe";
-//const char exe_path[] = "roms/gpu/quad/quad.exe";
+//const char exe_path[] = "roms/gpu/triangle/triangle.exe";
+const char exe_path[] = "roms/gpu/quad/quad.exe";
 //const char exe_path[] = "roms/dma/otc-test/otc-test.exe";
 //const char exe_path[] = "roms/psxtest_cpu.exe";
 
@@ -114,6 +115,8 @@ int main(int argc, char** argv)
 
 	//add_breakpoint(0xBFC07028, true, false);
 
+	int frame_count = 0;
+
 	// Emulation loop
 	while (update_interface() == 0)
 	{
@@ -127,6 +130,14 @@ int main(int argc, char** argv)
 
 			//if (!finished_bios_boot && cpu_state.pc == 0x80030000)
 			//	sideload_exe();
+		}
+
+		frame_count++;
+
+		if (frame_count == 59)
+		{
+			frame_count = 0;
+			request_interrupt(IRQ_VBLANK);
 		}
 
 		// TODO : Implement proper timings and emulate this correctly

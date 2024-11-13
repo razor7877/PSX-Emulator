@@ -55,3 +55,8 @@ void write_timer(uint32_t address, uint32_t value)
 		);
 	}
 }
+
+void tick_timers(int cycles)
+{
+
+}

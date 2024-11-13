@@ -5,6 +5,7 @@
 #include "logging.h"
 #include "coprocessor.h"
 #include "debug.h"
+#include "interrupt.h"
 
 #define TTY_BUFFER_SIZE (2048 * 32)
 
@@ -81,6 +82,9 @@ void print_tty_output()
 void handle_instruction(bool debug_info)
 {
     R0 = 0;
+
+    service_interrupts();
+
     // Decode next instruction
     cpu_state.current_opcode = read_word_internal(cpu_state.pc);
 
