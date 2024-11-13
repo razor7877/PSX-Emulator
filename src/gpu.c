@@ -286,7 +286,8 @@ static void gp0_misc(uint32_t value)
 
 				if (is_textured)
 				{
-					uint32_t uv = 1 + i * vertex_word_size + uv_offset;
+					uint32_t uv_index = 1 + i * vertex_word_size + uv_offset;
+					uint32_t uv = gpu_state.command_buffer[uv_index];
 
 					uv_coords[i].x = uv & 0xFF;
 					uv_coords[i].y = (uv & 0xFF00) >> 8;

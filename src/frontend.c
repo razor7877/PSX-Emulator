@@ -9,8 +9,8 @@
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
 
-#define VRAM_WIDTH 512
-#define VRAM_HEIGHT 1024
+#define VRAM_WIDTH 1024
+#define VRAM_HEIGHT 512
 
 #define PSX_RT frontend_state.psx_render_target
 #define VRAM_RT frontend_state.vram_render_target
@@ -55,7 +55,7 @@ const char* texture_f_shader =
     "uniform sampler2D textureSampler;"
     "void main()"
     "{"
-    "   FragColor = vec4(texCoord, 1.0, 1.0);"
+    "   FragColor = texture(textureSampler, texCoord);"
     "}";
 
 // Blit to quad shader
@@ -108,6 +108,7 @@ Frontend frontend_state = {
 void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, uint8_t blue)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
+    glViewport(0, 0, frontend_state.psx_render_target.size.x, frontend_state.psx_render_target.size.y);
     glEnable(GL_SCISSOR_TEST);
 
     y_coord = PSX_RT.size.y - y_coord;
@@ -147,6 +148,7 @@ void draw_triangle(Triangle triangle)
     };
 
     glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
+    glViewport(0, 0, frontend_state.psx_render_target.size.x, frontend_state.psx_render_target.size.y);
     glUseProgram(frontend_state.color_shader);
 
     GLuint vao = 0;
@@ -233,6 +235,7 @@ void draw_quad(Quad quad)
     };
 
     glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
+    glViewport(0, 0, frontend_state.psx_render_target.size.x, frontend_state.psx_render_target.size.y);
     glUseProgram(frontend_state.color_shader);
 
     GLuint vao = 0;
@@ -291,27 +294,88 @@ void draw_textured_quad(Quad quad)
         1.0f - (quad.v4.position.y / PSX_RT.size.y) * 2.0f,
         0.0f
     };
-
+    
     float uv[12] = {
         quad.v1.uv.x / 255.0f,
-        (255.0f - quad.v1.uv.y) / 255.0f,
+        quad.v1.uv.y / 255.0f,
         quad.v2.uv.x / 255.0f,
-        (255.0f - quad.v2.uv.y) / 255.0f,
+        quad.v2.uv.y / 255.0f,
         quad.v3.uv.x / 255.0f,
-        (255.0f - quad.v3.uv.y) / 255.0f,
+        quad.v3.uv.y / 255.0f,
         quad.v2.uv.x / 255.0f,
-        (255.0f - quad.v2.uv.y) / 255.0f,
+        quad.v2.uv.y / 255.0f,
         quad.v3.uv.x / 255.0f,
-        (255.0f - quad.v3.uv.y) / 255.0f,
+        quad.v3.uv.y / 255.0f,
         quad.v4.uv.x / 255.0f,
-        (255.0f - quad.v4.uv.y) / 255.0f,
+        quad.v4.uv.y / 255.0f,
     };
 
-    uint32_t texture_page_start = quad.uv_data.texture_page_y_base * 1024 + quad.uv_data.texture_page_x_base;
-    uint32_t clut_start;
+    // x in 16 halfword steps, y in 1 line steps
+    // Get CLUT address in VRAM
+    uint32_t clut_start = quad.uv_data.clut_position.y * 1024 + quad.uv_data.clut_position.x * 16;
+
+    uint8_t texture_data[256 * 256 * 3] = {0};
+
+    uint32_t x_start = quad.uv_data.texture_page_x_base * 64;
+    uint32_t y_start = quad.uv_data.texture_page_y_base * 256;;
+
+    TexturePageColors colors = quad.uv_data.texture_page_colors;
+
+    if (colors == PAGE_4_BIT)
+    {
+        for (int y = 0; y < 256; y++)
+        {
+            for (int x = 0; x < 256; x++)
+            {
+                uint32_t pixel_address = (y_start + y) * 1024 + (x_start + x / 4);
+                uint16_t pixel = gpu_state.vram[pixel_address];
+
+                uint16_t mask = 0xF << ((3 - x % 4) * 4);
+
+                texture_data[3 * 256 * y + 3 * x] = (pixel & mask) >> ((x % 4) * 4);
+                texture_data[3 * 256 * y + 3 * x + 1] = (pixel & mask) >> ((x % 4) * 4);
+                texture_data[3 * 256 * y + 3 * x + 2] = (pixel & mask) >> ((x % 4) * 4);
+            }
+        }
+    }
+    else if (colors == PAGE_8_BIT)
+    {
+
+    }
+    else if (colors == PAGE_15_BIT)
+    {
+        for (int y = 0; y < 256; y++)
+        {
+            for (int x = 0; x < 256; x++)
+            {
+                uint32_t pixel_address = (y_start + y) * 1024 + x_start + x;
+                uint16_t pixel = gpu_state.vram[pixel_address];
+
+                texture_data[3 * 256 * y + 3 * x] = pixel;
+                texture_data[3 * 256 * y + 3 * x + 1] = pixel;
+                texture_data[3 * 256 * y + 3 * x + 2] = pixel;
+            }
+        }
+    }
+
+    GLuint texture = 0;
+    
+    // Create a texture with the texture page data
+    glGenTextures(1, &texture);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     glBindFramebuffer(GL_FRAMEBUFFER, PSX_RT.framebuffer);
-    glUseProgram(frontend_state.color_shader);
+    glViewport(0, 0, frontend_state.psx_render_target.size.x, frontend_state.psx_render_target.size.y);
+    glUseProgram(frontend_state.texture_shader);
+
+    // Set the sampler on texture unit 0
+    glUniform1i(glGetUniformLocation(frontend_state.texture_shader, "textureSampler"), 0);
+    glUniform1i(glGetUniformLocation(frontend_state.texture_shader, "bitsPerPixel"), 0);
 
     GLuint vao = 0;
     GLuint vbo = 0;
@@ -330,7 +394,7 @@ void draw_textured_quad(Quad quad)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    // Send colors
+    // Send UV coordinates
     glBindBuffer(GL_ARRAY_BUFFER, texture_bo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(uv), uv, GL_STATIC_DRAW);
 
@@ -342,6 +406,7 @@ void draw_textured_quad(Quad quad)
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
     glDeleteBuffers(1, &texture_bo);
+    glDeleteTextures(1, &texture);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
