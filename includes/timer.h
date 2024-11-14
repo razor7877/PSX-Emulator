@@ -5,10 +5,10 @@
 
 typedef enum
 {
-	SYNC_MODE_0,
-	SYNC_MODE_1,
-	SYNC_MODE_2,
-	SYNC_MODE_3,
+	SYNC_MODE_0, // Pause counter during HBlank
+	SYNC_MODE_1, // Reset counter to 0 at HBlank
+	SYNC_MODE_2, // Reset counter to 0 at HBlank + pause outside of HBlank
+	SYNC_MODE_3, // Pause until HBlank occurs, then switch to free run
 } SyncMode;
 
 typedef enum
@@ -21,10 +21,12 @@ typedef enum
 
 typedef struct
 {
-	uint16_t counter_value;
+	uint32_t counter_value;
 	uint16_t counter_target;
 	uint32_t counter_mode;
 
+	bool sync_enable;
+	SyncMode sync_mode;
 	bool reset_on_target;
 	bool irq_on_target;
 	bool irq_on_max_value;
@@ -44,4 +46,4 @@ typedef struct
 uint32_t read_timer(uint32_t address);
 void write_timer(uint32_t address, uint32_t value);
 
-void tick_timers(int cycles);
+void system_clock_tick(int cycles);

@@ -6,6 +6,7 @@
 #include "coprocessor.h"
 #include "debug.h"
 #include "interrupt.h"
+#include "timer.h"
 
 #define TTY_BUFFER_SIZE (2048 * 32)
 
@@ -123,6 +124,8 @@ void handle_instruction(bool debug_info)
         R(cpu_state.fetch_reg_index) = cpu_state.fetch_reg_value;
         cpu_state.delay_fetch = false;
     }
+
+    system_clock_tick(1);
 }
 
 /// <summary>
