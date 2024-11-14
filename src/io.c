@@ -45,7 +45,7 @@ uint32_t read_io(uint32_t address)
 	if (address >= CDROM_REGS_START && address < CDROM_REGS_END)
 	{
 		log_warning("Unhandled CDROM registers read at address %x\n", address);
-		return 0xFFFFFFFF;
+		return 0b00001000;
 	}
 
 	if (address >= GPU_REGS_START && address < GPU_REGS_END)

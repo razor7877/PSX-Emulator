@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define DOT_CLOCK_CYCLES 
+#define SYS_CLOCK_8_CYCLES 8
+
 typedef enum
 {
 	SYNC_MODE_0, // Pause counter during HBlank
@@ -18,6 +21,14 @@ typedef enum
 	CLOCK_SRC_2,
 	CLOCK_SRC_3,
 } ClockSource;
+
+typedef enum
+{
+	SYS_CLOCK,
+	SYS_CLOCK_8,
+	HBLANK_CLOCK,
+	DOT_CLOCK
+} ClockSourceType;
 
 typedef struct
 {
@@ -40,7 +51,25 @@ typedef struct
 
 typedef struct
 {
+	/// <summary>
+	/// The state of timers 0-2
+	/// </summary>
 	Timer timers[3];
+
+	/// <summary>
+	/// An internal counter to keep track of the HBlank clock source
+	/// </summary>
+	int hblank_clock_internal;
+
+	/// <summary>
+	/// An internal counter to keep track of the dot clock counter
+	/// </summary>
+	int dot_clock_internal;
+
+	/// <summary>
+	/// An internal counter to keep track of the 1/8th system clock clock source
+	/// </summary>
+	int sys_clock_8_internal;
 } TimerState;
 
 uint32_t read_timer(uint32_t address);

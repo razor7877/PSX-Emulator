@@ -6,6 +6,16 @@
 #include "frontend.h"
 #include "memory.h"
 
+#define GPU_FREQ 53222400 // GPU Frequency in Hz
+#define DOT_CLK_256 5322240
+#define DOT_CLK_320 6652800
+#define DOT_CLK_368 7603200
+#define DOT_CLK_512 10644480
+#define DOT_CLK_640 13305600
+
+#define NTSC_SCANLINE_CYCLES 3413 // In GPU cycles
+#define GPU_TO_CPU_CYCLES (CPU_FREQ / GPU_FREQ)
+
 /// <summary>
 /// The possible GP0 commands
 /// </summary>
