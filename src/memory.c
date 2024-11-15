@@ -188,12 +188,6 @@ uint32_t read_word_internal(uint32_t address)
 {
 	check_data_breakpoints(address);
 
-	if ((address & 0b11) != 0)
-	{
-		log_error("Unaligned memory read exception! PC is %x\n", cpu_state.pc);
-		handle_mem_exception(ADEL, address);
-	}
-
 	if (address <= 0x1FC00000) // KUSEG read
 		return read_word_kuseg(address);
 	else if (address >= 0x80000000 && address <= 0x9FC00000 + 0x80000) // KSEG 0 read
@@ -322,14 +316,6 @@ static void write_word_kseg2(uint32_t address, uint32_t value)
 /// <param name="value">The value to be written</param>
 void write_word(uint32_t address, uint32_t value)
 {
-	if ((address & 0b11) != 0)
-	{
-		log_error("Unaligned memory write exception! PC is %x\n", cpu_state.pc);
-		handle_mem_exception(ADES, address);
-		debug_state.in_debug = true;
-		return;
-	}
-
 	check_data_breakpoints(address);
 
 	// If bit 16 of reg 12 in CPR0 is set, writes are directed to the data cache

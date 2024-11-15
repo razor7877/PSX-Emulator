@@ -7,6 +7,7 @@
 #include "debug.h"
 #include "interrupt.h"
 #include "timer.h"
+#include "memory.h"
 
 #define TTY_BUFFER_SIZE (2048 * 32)
 
@@ -682,7 +683,12 @@ void sb()
     uint32_t word_value = read_word(word_index);
     uint32_t new_value = (word_value & original_value_mask) | indexed_value;
 
-    write_word(word_index, new_value);
+    // TODO : Ugly hack to get correct addresses on CDROM R/W
+    // Need to make a dedicated 8 bit write function!
+    if (address >= 0x1F801800 && address <= 0x1F801803)
+        write_word(address, new_value);
+    else
+        write_word(word_index, new_value);
 }
 
 void sh()

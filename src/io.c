@@ -5,6 +5,7 @@
 #include "interrupt.h"
 #include "dma.h"
 #include "timer.h"
+#include "cdrom.h"
 
 #define IGNORE_SPU_LOGS
 
@@ -43,10 +44,7 @@ uint32_t read_io(uint32_t address)
 		return read_timer(address);
 
 	if (address >= CDROM_REGS_START && address < CDROM_REGS_END)
-	{
-		log_warning("Unhandled CDROM registers read at address %x\n", address);
-		return 0b00001000;
-	}
+		return read_cdrom(address);
 
 	if (address >= GPU_REGS_START && address < GPU_REGS_END)
 		return read_gpu(address);
@@ -122,7 +120,7 @@ void write_io(uint32_t address, uint32_t value)
 	}
 	else if (address >= CDROM_REGS_START && address < CDROM_REGS_END)
 	{
-		log_warning("Unhandled CDROM registers write at address %x value %x\n", address, value);
+		write_cdrom(address, value);
 	}
 	else if (address >= GPU_REGS_START && address < GPU_REGS_END)
 	{
