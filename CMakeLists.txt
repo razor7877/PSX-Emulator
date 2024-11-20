@@ -27,18 +27,25 @@ target_compile_definitions(cimgui PRIVATE
 
 # Query source & include files
 file(GLOB SRC "src/*.c")
+file(GLOB SRC_FRONTEND "src/frontend/*.c")
+
 file(GLOB INCLUDES "includes/*.h")
+file(GLOB INCLUDES_FRONTEND "includes/frontend/*.h")
 
 add_executable(PSX_Emulator
 	${SRC}
+	${SRC_FRONTEND}
 	${INCLUDES}
+	${INCLUDES_FRONTEND}
 	src/glad/glad.c
-	libs/cimgui/imgui/backends/
 )
 
 # Group files with the same hierarchy as in the file system
 source_group("src" FILES ${SRC})
+source_group("src\\frontend" FILES ${SRC_FRONTEND})
+
 source_group("includes" FILES ${INCLUDES})
+source_group("includes\\frontend" FILES ${INCLUDES_FRONTEND})
 
 # Add include folders so they are found by the compiler
 target_include_directories(PSX_Emulator PUBLIC

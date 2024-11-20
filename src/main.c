@@ -8,7 +8,7 @@
 #include "cpu.h"
 #include "debug.h"
 #include "tests.h"
-#include "frontend.h"
+#include "frontend/gl.h"
 #include "logging.h"
 #include "gpu.h"
 #include "interrupt.h"

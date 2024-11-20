@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "frontend.h"
+#include "frontend/gl.h"
 #include "memory.h"
 
 #define GPU_FREQ 53222400 // GPU Frequency in Hz
