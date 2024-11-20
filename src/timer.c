@@ -4,6 +4,8 @@
 #include "logging.h"
 #include "cpu.h"
 #include "gpu.h"
+#include "interrupt.h"
+#include "cdrom.h"
 
 TimerState timer_state = {0};
 
@@ -82,6 +84,8 @@ void write_timer(uint32_t address, uint32_t value)
 
 void system_clock_tick(int cycles)
 {
+	tick_cdrom(cycles);
+
 	bool hblank_tick = false;
 	bool dot_clock_tick = false;
 	bool sys_clock_8_tick = false;
@@ -117,7 +121,7 @@ void system_clock_tick(int cycles)
 
 	timer_state.sys_clock_8_internal += cycles;
 
-	if (timer_state.sys_clock_8_internal == SYS_CLOCK_8_CYCLES)
+	if (timer_state.sys_clock_8_internal >= SYS_CLOCK_8_CYCLES)
 	{
 		sys_clock_8_tick = true;
 		timer_state.sys_clock_8_internal = 0;
@@ -180,6 +184,7 @@ void system_clock_tick(int cycles)
 
 			if (timer->irq_on_target && timer->irq_bit)
 			{
+				request_interrupt(IRQ_TMR0 + i);
 				log_warning("Unhandled timer IRQ request on target\n");
 			}
 		}
@@ -189,6 +194,7 @@ void system_clock_tick(int cycles)
 
 			if (timer->irq_on_max_value && timer->irq_bit)
 			{
+				request_interrupt(IRQ_TMR0 + i);
 				log_warning("Unhandled timer IRQ request on max value\n");
 			}
 		}

@@ -6,6 +6,7 @@
 #include "dma.h"
 #include "timer.h"
 #include "cdrom.h"
+#include "debug.h"
 
 #define IGNORE_SPU_LOGS
 
@@ -16,6 +17,9 @@
 /// <returns>The word at the IO port address</returns>
 uint32_t read_io(uint32_t address)
 {
+	if (debug_state.print_instructions)
+		log_debug("IO Read at ADR %x\n", address);
+
 	if (address >= MEM_CTRL1_START && address < MEM_CTRL1_END)
 	{
 		log_warning("Unhandled memory control 1 read at address %x\n", address);
@@ -94,6 +98,9 @@ uint32_t read_io(uint32_t address)
 
 void write_io(uint32_t address, uint32_t value)
 {
+	if (debug_state.print_instructions)
+		log_debug("IO Write at ADR %x with VALUE %x\n", address, value);
+
 	if (address >= MEM_CTRL1_START && address < MEM_CTRL1_END)
 	{
 		log_warning("Unhandled memory control 1 write at address %x value %x\n", address, value);

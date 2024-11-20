@@ -156,7 +156,6 @@ void handle_exception(ExceptionType exception)
     switch (exception)
     {
         case INTERRUPT: // Interrupt
-            log_error("Unhandled interrupt exception!\n");
             break;
 
         case ADEL: // Address error - Data load/Instruction fetch

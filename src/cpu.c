@@ -126,7 +126,7 @@ void handle_instruction(bool debug_info)
         cpu_state.delay_fetch = false;
     }
 
-    system_clock_tick(1);
+    system_clock_tick(2);
 }
 
 /// <summary>
@@ -680,7 +680,11 @@ void sb()
     uint32_t indexed_value = value << (byte_index * 8);
 
     // Original value in memory
-    uint32_t word_value = read_word(word_index);
+    uint32_t word_value;
+    if (address >= 0x1F801800 && address <= 0x1F801803)
+        word_value = read_word(address);
+    else
+        word_value = read_word(word_index);
     uint32_t new_value = (word_value & original_value_mask) | indexed_value;
 
     // TODO : Ugly hack to get correct addresses on CDROM R/W

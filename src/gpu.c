@@ -33,7 +33,11 @@ uint32_t read_gpu(uint32_t address)
 		return gpu_state.gpu_read;
 
 	if (address == 0x1F801814)
+	{
+		gpu_state.gpu_status.drawing_odd_lines = !gpu_state.gpu_status.drawing_odd_lines;
+		update_gpustat();
 		return gpu_state.gpu_stat;
+	}
 
 	log_warning("Unhandled GPU register read at address %x\n", address);
 
