@@ -1,9 +1,13 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+#define PSX_RT frontend_state.psx_render_target
+#define VRAM_RT frontend_state.vram_render_target
 
 /// <summary>
 /// Functions and state for implementing the GPU operations using the OpenGL graphics API
@@ -73,12 +77,34 @@ typedef struct
 
 enum TexturePageColors;
 
+/// <summary>
+/// Represents the UV data for a primitive
+/// </summary>
 typedef struct
 {
+	/// <summary>
+	/// The position of the CLUT in VRAM
+	/// </summary>
 	Vec2 clut_position;
+
+	/// <summary>
+	/// The x coordinate of the texture page, in 64 halfword steps
+	/// </summary>
 	uint8_t texture_page_x_base;
+
+	/// <summary>
+	/// The y coordinate of the texture page, in 256 line steps
+	/// </summary>
 	uint8_t texture_page_y_base;
+
+	/// <summary>
+	/// The state of the semi transparency flag
+	/// </summary>
 	uint8_t semi_transparency;
+
+	/// <summary>
+	/// The texture page color mode
+	/// </summary>
 	enum TexturePageColors texture_page_colors;
 } UVData;
 
@@ -120,22 +146,74 @@ typedef struct
 /// </summary>
 typedef struct
 {
+	/// <summary>
+	/// The OpenGL handle to the framebuffer
+	/// </summary>
 	GLuint framebuffer;
+
+	/// <summary>
+	/// The OpenGL handle to the renderbuffer
+	/// </summary>
 	GLuint depth_stencil_buffer;
+
+	/// <summary>
+	/// The OpenGL handle to the framebuffer texture
+	/// </summary>
 	GLuint render_texture;
+
+	/// <summary>
+	/// The draw buffer that specifies the output color attachment
+	/// </summary>
 	GLuint draw_buffer;
+
+	/// <summary>
+	/// The size of the framebuffer, in pixels
+	/// </summary>
 	Vec2 size;
 } RenderTarget;
 
 typedef struct
 {
+	/// <summary>
+	/// A pointer to the GLFW window handle
+	/// </summary>
 	GLFWwindow* window;
+
+	bool fullscreen_mode;
+
+	/// <summary>
+	/// The OpenGL handle for the gouraud/flat shading shader
+	/// </summary>
 	GLuint color_shader;
+
+	/// <summary>
+	/// The OpenGL handle for the textured shader
+	/// </summary>
 	GLuint texture_shader;
+
+	/// <summary>
+	/// The OpenGL handle for the blit to quad shader
+	/// </summary>
 	GLuint blit_shader;
+
+	/// <summary>
+	/// The current render target that should be output to the screen
+	/// </summary>
 	RenderTarget* current_render_target;
+
+	/// <summary>
+	/// The render target for the PSX internal framebuffer
+	/// </summary>
 	RenderTarget psx_render_target;
+
+	/// <summary>
+	/// The render target for the VRAM view
+	/// </summary>
 	RenderTarget vram_render_target;
+
+	/// <summary>
+	/// The current size of the window, in pixels
+	/// </summary>
 	Vec2 window_size;
 } Frontend;
 

@@ -114,7 +114,7 @@ int main(int argc, char** argv)
 	}
 
 	//add_breakpoint(0x80058760, true, false);
-	add_breakpoint(0x80059E00, true, false);
+	//add_breakpoint(0x80059E00, true, false);
 
 	int frame_count = 0;
 

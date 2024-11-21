@@ -16,9 +16,6 @@
 #define VRAM_WIDTH 1024
 #define VRAM_HEIGHT 512
 
-#define PSX_RT frontend_state.psx_render_target
-#define VRAM_RT frontend_state.vram_render_target
-
 // Flat/Gouraud polygon shader
 const char* color_v_shader =
     "#version 410 core\n"
@@ -96,8 +93,34 @@ const char* blit_f_shader =
     "   FragColor = vec4(texture(textureSampler, texCoord).rgb, 1.0);"
     "}";
 
+const float quad_verts[] = {
+    -1.0f, 1.0f, 0.0f, // Top left
+    1.0f, 1.0f, 0.0f, // Top right
+    -1.0f, -1.0f, 0.0f, // Bottom left
+
+    1.0f, 1.0f, 0.0f, // Top right
+    1.0f, -1.0f, 0.0f, // Bottom right
+    -1.0f, -1.0f, 0.0f, // Bottom left
+};
+
+const float quad_tex_coords[] = {
+    0.0f, 0.0f, // Top left
+    1.0f, 0.0f, // Top right
+    0.0f, 1.0f, // Bottom left
+
+    1.0f, 0.0f, // Top right
+    1.0f, 1.0f, // Bottom right
+    0.0f, 1.0f, // Bottom left
+};
+
+GLuint vram_tex = 0;
+GLuint blit_quad_vao = 0;
+GLuint blit_quad_vbo = 0;
+GLuint blit_quad_texture_bo = 0;
+
 Frontend frontend_state = {
 	.window = NULL,
+    .fullscreen_mode = false,
     .color_shader = 0,
     .blit_shader = 0,
     .current_render_target = &frontend_state.psx_render_target,
@@ -478,8 +501,11 @@ static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE)
+        glfwSetWindowShouldClose(frontend_state.window, true);
+
     if (action == GLFW_PRESS && key == GLFW_KEY_SPACE)
-        debug_state.in_debug = !debug_state.in_debug;
+        frontend_state.fullscreen_mode = !frontend_state.fullscreen_mode;
 
     if (action == GLFW_PRESS && key == GLFW_KEY_V)
     {
@@ -625,31 +651,6 @@ static void resize_framebuffer(RenderTarget* render_target, Vec2 new_size)
     create_framebuffer(render_target);
 }
 
-GLuint vram_tex = 0;
-GLuint blit_quad_vao = 0;
-GLuint blit_quad_vbo = 0;
-GLuint blit_quad_texture_bo = 0;
-
-const float quad_verts[] = {
-    -1.0f, 1.0f, 0.0f, // Top left
-    1.0f, 1.0f, 0.0f, // Top right
-    -1.0f, -1.0f, 0.0f, // Bottom left
-
-    1.0f, 1.0f, 0.0f, // Top right
-    1.0f, -1.0f, 0.0f, // Bottom right
-    -1.0f, -1.0f, 0.0f, // Bottom left
-};
-
-const float quad_tex_coords[] = {
-    0.0f, 0.0f, // Top left
-    1.0f, 0.0f, // Top right
-    0.0f, 1.0f, // Bottom left
-
-    1.0f, 0.0f, // Top right
-    1.0f, 1.0f, // Bottom right
-    0.0f, 1.0f, // Bottom left
-};
-
 static void setup_blit_quad()
 {
     // Generate VAO and VBO and bind them
@@ -707,7 +708,7 @@ int start_interface()
 	return 0;
 }
 
-int update_interface()
+static void update_vram()
 {
     // Send VRAM data to the texture
     glBindTexture(GL_TEXTURE_2D, vram_tex);
@@ -729,7 +730,10 @@ int update_interface()
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
 
+static void blit_to_screen()
+{
     // Blit from PSX framebuffer to window framebuffer
     glBindFramebuffer(GL_READ_FRAMEBUFFER, frontend_state.current_render_target->framebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -740,9 +744,19 @@ int update_interface()
     glViewport(0, 0, tgt_size.x, tgt_size.y);
     glScissor(0, 0, src_size.x, src_size.y);
     glBlitFramebuffer(0, 0, src_size.x, src_size.y, 0, 0, tgt_size.x, tgt_size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+}
 
-    gui_update();
-    gui_render();
+int update_interface()
+{
+    update_vram();
+
+    if (frontend_state.fullscreen_mode)
+        blit_to_screen();
+    else
+    {
+        gui_update();
+        gui_render();
+    }
 
     int glError = glGetError();
     if (glError != 0)
