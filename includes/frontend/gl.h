@@ -6,6 +6,10 @@
 #include <GLFW/glfw3.h>
 
 /// <summary>
+/// Functions and state for implementing the GPU operations using the OpenGL graphics API
+/// </summary>
+
+/// <summary>
 /// A two-dimensional vector of floats
 /// </summary>
 typedef struct

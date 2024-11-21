@@ -4,6 +4,10 @@
 #include <stdbool.h>
 
 /// <summary>
+/// Functions and state for emulating the different transfers of the DMA controller
+/// </summary>
+
+/// <summary>
 /// The possible DMA transfer modes
 /// </summary>
 typedef enum

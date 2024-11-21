@@ -8,6 +8,11 @@
 #define MAX_BREAKPOINTS 32
 #define CPU_TRACE_SIZE 40
 
+/// <summary>
+/// Functions and state for debugging tools - This is emulator level debugging, not emulation
+/// of the PSX hardware/software breakpoints
+/// </summary>
+
 typedef struct
 {
 	uint32_t address;

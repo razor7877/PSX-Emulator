@@ -17,6 +17,10 @@
 #define GPU_TO_CPU_CYCLES (CPU_FREQ / GPU_FREQ)
 
 /// <summary>
+/// Functions and state for emulating the GPU state, but not the graphics API implementation
+/// </summary>
+
+/// <summary>
 /// The possible GP0 commands
 /// </summary>
 typedef enum

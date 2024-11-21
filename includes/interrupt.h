@@ -24,6 +24,10 @@ typedef struct
 } InterruptState;
 
 /// <summary>
+/// Functions and state for emulating the PSX interrupt behavior
+/// </summary>
+
+/// <summary>
 /// Reads from an interrupt related register and returns the contents
 /// </summary>
 /// <param name="address">The address of the interrupt register to read</param>

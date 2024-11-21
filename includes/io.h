@@ -41,5 +41,9 @@
 #define SPU_INTERNAL_START 0x1F801E00
 #define SPU_INTERNAL_END (0x1F801E80 + 0x180)
 
+/// <summary>
+/// Functions for dispatching I/O read/write operations to the corresponding modules
+/// </summary>
+
 uint32_t read_io(uint32_t address);
 void write_io(uint32_t address, uint32_t value);

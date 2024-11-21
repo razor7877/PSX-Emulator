@@ -121,6 +121,9 @@ int main(int argc, char** argv)
 	// Emulation loop
 	while (update_interface() == 0)
 	{
+		if (debug_state.in_debug)
+			continue;
+
 		int cycle_count = 0;
 
 		// Run emulation until we finish a frame or we encounter a breakpoint
@@ -144,9 +147,6 @@ int main(int argc, char** argv)
 		// TODO : Implement proper timings and emulate this correctly
 		gpu_state.gpu_status.drawing_odd_lines = !gpu_state.gpu_status.drawing_odd_lines;
 		update_gpustat();
-
-		if (debug_state.in_debug) // In debug mode, query user input
-			handle_debug_input();
 	}
 
 	stop_interface();

@@ -6,6 +6,10 @@
 #define DOT_CLOCK_CYCLES 
 #define SYS_CLOCK_8_CYCLES 8
 
+/// <summary>
+/// Functions and state for emulating the timer behavior
+/// </summary>
+
 typedef enum
 {
 	SYNC_MODE_0, // Pause counter during HBlank

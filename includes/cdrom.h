@@ -5,6 +5,10 @@
 
 #define CD_FIFO_SIZE 16
 
+/// <summary>
+/// Functions and state for emulating the CD-ROM drive
+/// </summary>
+
 typedef struct
 {
 	int index;

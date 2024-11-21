@@ -14,6 +14,10 @@
 #define EPC CPR0(14)
 #define PRID CPR0(15)
 
+/// <summary>
+/// Functions and state for emulating the coprocessor 0 and emulating exception behavior
+/// </summary>
+
 typedef enum
 {
 	INTERRUPT = 0,

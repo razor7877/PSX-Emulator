@@ -46,6 +46,11 @@
 #define R30 cpu_state.registers[30]
 #define R31 cpu_state.registers[31]
 
+/// <summary>
+/// Functions and state for emulating the CPU, the main emulation loop,
+/// and implementing the instruction set
+/// </summary>
+
 typedef struct
 {
 	const char* disassembly;

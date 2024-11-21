@@ -20,6 +20,10 @@
 #define CONTROL_REGISTERS_SIZE 512
 
 /// <summary>
+/// Functions and state for emulating the various memory related operations
+/// </summary>
+
+/// <summary>
 /// Clears all the system's memory
 /// </summary>
 void clear_memory();

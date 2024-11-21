@@ -10,8 +10,8 @@
 #include "debug.h"
 #include "gpu.h"
 
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 480
+#define WINDOW_WIDTH 640 * 2
+#define WINDOW_HEIGHT 480 * 2
 
 #define VRAM_WIDTH 1024
 #define VRAM_HEIGHT 512
