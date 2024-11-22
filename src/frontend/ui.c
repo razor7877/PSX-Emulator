@@ -1,9 +1,13 @@
+#include <stdlib.h>
+#include <stdio.h>
+
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include <cimgui.h>
 
 #include "frontend/gl.h"
 #include "cpu.h"
 #include "memory.h"
+#include "debug.h"
 
 static ImGuiContext* ctx;
 static ImGuiIO* io;
@@ -46,9 +50,9 @@ void gui_update()
     ImVec2 main_menu_bar_size;
     igGetWindowSize(&main_menu_bar_size);
 
-    if (igBeginMenu("Windows", true))
+    if (igBeginMenu("File", true))
     {
-        igMenuItemEx("File", NULL, NULL, false, true);
+        igMenuItemEx("Load file", NULL, NULL, false, true);
 
         igEndMenu();
     }
@@ -107,36 +111,206 @@ void gui_update()
 
     const int instruction_count = 20;
 
+    // We show the instructions before and after the current one
     for (int i = -instruction_count / 2; i < instruction_count / 2; i++)
     {
+        uint32_t opcode_address = cpu_state.pc + i * 4;
+        uint32_t opcode = read_word(opcode_address);
+
         // Get primary opcode from 6 highest bits
-        uint8_t primary_opcode = (cpu_state.current_opcode & 0xFC000000) >> 26;
+        uint8_t primary_opcode = (opcode & 0xFC000000) >> 26;
         // Get secondary opcode from 6 lowest bits
-        uint8_t secondary_opcode = cpu_state.current_opcode & 0x3F;
+        uint8_t secondary_opcode = opcode & 0x3F;
 
         char* disassembly = primary_opcodes[primary_opcode].disassembly;
         if (primary_opcode == 0x00)
             disassembly = secondary_opcodes[secondary_opcode].disassembly;
 
-        if (i == 0)
-            igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.5f, 0.5f, 1.0f, 1.0f });
+        Breakpoint* breakpoint = NULL;
 
-        uint32_t opcode = read_word(cpu_state.pc + i);
+        // Check if there is a breakpoint for this address
+        for (int i = 0; i < debug_state.breakpoint_count; i++)
+        {
+            Breakpoint* br = &debug_state.code_breakpoints[i];
+            if (br->address == opcode_address)
+                breakpoint = br;
+        }
+
+        bool pushed_color = false;
+
+        if (i == 0) // The instruction being executed
+        {
+            igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.5f, 0.5f, 1.0f, 1.0f });
+            pushed_color = true;
+        }
+        else if(breakpoint && (breakpoint->break_on_code || breakpoint->break_on_data))
+        {
+            igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.2f, 0.2f, 1.0f });
+            pushed_color = true;
+        }
 
         igText("%x : %s - %x\tRS(r%d): %x RT(r%d): %x RD(r%d): %x\n",
-            cpu_state.pc + i, disassembly, opcode,
+            opcode_address, disassembly, opcode,
             rs(opcode), R(rs(opcode)),
             rt(opcode), R(rt(opcode)),
             rd(opcode), R(rd(opcode))
         );
         
-        if (i == 0)
+        if (pushed_color)
             igPopStyleColor(1);
+    }
+
+    if (debug_state.in_debug)
+    {
+        if (igButton("Resume", (struct ImVec2) { 100, 20 }))
+            debug_state.in_debug = false;
+    }
+    else
+    {
+        if (igButton("Pause", (struct ImVec2) { 100, 20 }))
+            debug_state.in_debug = true;
+    }
+    igSameLine(0, -1);
+
+    if (!debug_state.in_debug)
+    {
+        igPushItemFlag(ImGuiItemFlags_Disabled, true);
+        igPushStyleVar_Float(ImGuiStyleVar_Alpha, 0.5f);
+    }
+
+    if (igButton("Step over", (struct ImVec2) { 80, 20 }))
+    {
+
+    }
+    igSameLine(0, -1);
+
+    if (igButton("Step into", (struct ImVec2) { 80, 20 }))
+        handle_instruction(true);
+
+    igSameLine(0, -1);
+
+    if (igButton("Step out", (struct ImVec2) { 80, 20 }))
+    {
+
+    }
+    igSameLine(0, -1);
+
+    if (!debug_state.in_debug)
+    {
+        igPopItemFlag();
+        igPopStyleVar(1);
     }
 
     igEnd();
 
-    igBegin("Breakpoints", NULL, ImGuiWindowFlags_None);
+    igBegin("Debug", NULL, ImGuiWindowFlags_None);
+
+    igText("Breakpoints");
+
+    if (igButton("Add breakpoint", (struct ImVec2) { 120, 20 }))
+        add_breakpoint(cpu_state.pc, false, false);
+
+    for (int i = 0; i < MAX_BREAKPOINTS; i++)
+    {
+        Breakpoint* br = &debug_state.code_breakpoints[i];
+
+        if (br->in_use)
+        {
+            igPushID_Ptr(br);
+
+            igText("%02d:", i);
+            igSameLine(0, -1);
+
+            static char address_input[MAX_BREAKPOINTS][256];
+            snprintf(address_input[i], sizeof(address_input[i]), "%x", br->address);
+
+            igPushItemWidth(100);
+            if (igInputText("", address_input[i], sizeof(address_input[i]), 0, 0, NULL))
+            {
+                uint32_t address = strtoull(address_input[i], NULL, 16);
+                br->address = address;
+            }
+            igPopItemWidth();
+            igSameLine(0, -1);
+
+            igText("Break on:");
+            igSameLine(0, -1);
+
+            igCheckbox("Code", &br->break_on_code);
+            igSameLine(0, -1);
+
+            igCheckbox("Data", &br->break_on_data);
+            igSameLine(0, -1);
+
+            if (igButton("X", (struct ImVec2) { 20, 20 }))
+                delete_breakpoint(i);
+
+            igPopID();
+        }
+    }
+
+    igEnd();
+
+    igBegin("CPU", NULL, ImGuiWindowFlags_None);
+
+    igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
+    igText("pc: ");
+    igPopStyleColor(1);
+    igSameLine(0, -1);
+    igText("%08x", cpu_state.pc);
+    igSameLine(0, 30);
+
+    igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
+    igText("hi: ");
+    igPopStyleColor(1);
+    igSameLine(0, -1);
+    igText("%08x", cpu_state.hi);
+    igSameLine(0, 30);
+
+    igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
+    igText("lo: ");
+    igPopStyleColor(1);
+    igSameLine(0, -1);
+    igText("%08x", cpu_state.lo);
+
+    for (int i = 0; i < 32; i++)
+    {
+        int index = 8 * (i % 4) + (i / 4);
+        igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
+        igText("r%02d: ", index);
+        igPopStyleColor(1);
+        igSameLine(0, -1);
+        igText("%08x", cpu_state.registers[index]);
+
+        if ((i % 4) != 3)
+            igSameLine(0, 30);
+
+        /*igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
+        igText("r%02d: ", i * 4 + 1);
+        igPopStyleColor(1);
+        igSameLine(0, -1);
+        igText("%08x", cpu_state.registers[i * 4 + 1]);
+        igSameLine(0, 30);
+
+        igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
+        igText("r%02d: ", i * 4 + 2);
+        igPopStyleColor(1);
+        igSameLine(0, -1);
+        igText("%08x", cpu_state.registers[i * 4 + 2]);
+        igSameLine(0, 30);
+
+        igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
+        igText("r%02d: ", i * 4 + 3);
+        igPopStyleColor(1);
+        igSameLine(0, -1);
+        igText("%08x", cpu_state.registers[i * 4 + 3]);*/
+    }
+
+    igEnd();
+
+    igBegin("TTY Output", NULL, ImGuiWindowFlags_None);
+
+    igText("%s", debug_state.tty);
 
     igEnd();
 

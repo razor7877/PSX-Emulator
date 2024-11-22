@@ -7,6 +7,7 @@
 
 #define MAX_BREAKPOINTS 32
 #define CPU_TRACE_SIZE 40
+#define TTY_BUFFER_SIZE (2048 * 32)
 
 /// <summary>
 /// Functions and state for debugging tools - This is emulator level debugging, not emulation
@@ -16,6 +17,7 @@
 typedef struct
 {
 	uint32_t address;
+	bool in_use;
 	bool break_on_data;
 	bool break_on_code;
 	bool enabled;
@@ -52,6 +54,16 @@ typedef struct
 	/// The current index of the earliest instruction in the CPU trace
 	/// </summary>
 	int trace_start;
+
+	/// <summary>
+	/// A buffer to store the data printed out to the TTY
+	/// </summary>
+	char tty[TTY_BUFFER_SIZE];
+
+	/// <summary>
+	/// The current index into the TTY
+	/// </summary>
+	int char_index;
 } DebugState;
 
 extern DebugState debug_state;

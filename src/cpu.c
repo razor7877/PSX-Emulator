@@ -9,8 +9,6 @@
 #include "timer.h"
 #include "memory.h"
 
-#define TTY_BUFFER_SIZE (2048 * 32)
-
 cpu cpu_state = {
     .registers = {0},
     .current_opcode = 0x00,
@@ -20,9 +18,6 @@ cpu cpu_state = {
     .delay_jump = false,
     .jmp_address = 0x00
 };
-
-char tty[TTY_BUFFER_SIZE] = { 0 };
-int char_index = 0;
 
 void reset_cpu_state()
 {
@@ -52,8 +47,8 @@ static void check_tty_output()
     // Check for a putchar() call
     if ((cpu_state.pc == 0xA0 && R9 == 0x3C) || (cpu_state.pc == 0xB0 && R9 == 0x3D))
     {
-        tty[char_index] = (char)(uint8_t)R4;
-        char_index = (char_index + 1) % TTY_BUFFER_SIZE;
+        debug_state.tty[debug_state.char_index] = (char)(uint8_t)R4;
+        debug_state.char_index = (debug_state.char_index + 1) % TTY_BUFFER_SIZE;
     }
 }
 
@@ -78,7 +73,7 @@ void print_debug_info(cpu cpu_state)
 
 void print_tty_output()
 {
-    printf("--- TTY DEBUG OUTPUT ---\n%s\n--- END TTY DEBUG OUTPUT\n\n", tty);
+    printf("--- TTY DEBUG OUTPUT ---\n%s\n--- END TTY DEBUG OUTPUT\n\n", debug_state.tty);
 }
 
 void handle_instruction(bool debug_info)

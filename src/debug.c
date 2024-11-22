@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "debug.h"
 #include "logging.h"
@@ -12,6 +13,8 @@ DebugState debug_state = {
 	.breakpoint_count = 0,
 	.in_debug = false,
 	.print_instructions = false,
+	.tty = {0},
+	.char_index = 0,
 };
 
 char input[256] = {0};
@@ -172,11 +175,11 @@ void add_cpu_trace(cpu cpu_state)
 void check_code_breakpoints(uint32_t address)
 {
 	// Check for any reached breakpoints
-	for (int i = 0; i < debug_state.breakpoint_count; i++)
+	for (int i = 0; i < MAX_BREAKPOINTS; i++)
 	{
 		Breakpoint br = debug_state.code_breakpoints[i];
 
-		if (br.enabled && br.break_on_code && address == br.address)
+		if (br.in_use && br.enabled && br.break_on_code && address == br.address)
 		{
 			log_info_no_prefix("Reached code breakpoint at %x\n", debug_state.code_breakpoints[i]);
 			debug_state.in_debug = true;
@@ -187,11 +190,11 @@ void check_code_breakpoints(uint32_t address)
 void check_data_breakpoints(uint32_t address)
 {
 	// Check for any reached breakpoints
-	for (int i = 0; i < debug_state.breakpoint_count; i++)
+	for (int i = 0; i < MAX_BREAKPOINTS; i++)
 	{
 		Breakpoint br = debug_state.code_breakpoints[i];
 
-		if (br.enabled && br.break_on_data && address == br.address)
+		if (br.in_use && br.enabled && br.break_on_data && address == br.address)
 		{
 			log_info_no_prefix("Reached data breakpoint at %x\n", debug_state.code_breakpoints[i]);
 			debug_state.in_debug = true;
@@ -207,24 +210,33 @@ void add_breakpoint(uint32_t address, bool break_on_code, bool break_on_data)
 		return;
 	}
 
-	debug_state.code_breakpoints[debug_state.breakpoint_count].address = address;
-	debug_state.code_breakpoints[debug_state.breakpoint_count].enabled = true;
-	debug_state.code_breakpoints[debug_state.breakpoint_count].break_on_code = break_on_code;
-	debug_state.code_breakpoints[debug_state.breakpoint_count].break_on_data = break_on_data;
+	int index = 0;
+
+	while (debug_state.code_breakpoints[index].in_use && index < MAX_BREAKPOINTS)
+		index++;
+
+	debug_state.code_breakpoints[index].address = address;
+	debug_state.code_breakpoints[index].in_use = true;
+	debug_state.code_breakpoints[index].enabled = true;
+	debug_state.code_breakpoints[index].break_on_code = break_on_code;
+	debug_state.code_breakpoints[index].break_on_data = break_on_data;
 
 	debug_state.breakpoint_count++;
 }
 
 void delete_breakpoint(int index)
 {
-	if (index < 0 || index >= debug_state.breakpoint_count)
+	if (index < 0 || index >= MAX_BREAKPOINTS)
 	{
 		log_error("Incorrect index when trying to delete code breakpoint!\n");
 		return;
 	}
 
 	debug_state.code_breakpoints[index].address = 0;
+	debug_state.code_breakpoints[index].in_use = false;
 	debug_state.code_breakpoints[index].enabled = false;
 	debug_state.code_breakpoints[index].break_on_code = false;
 	debug_state.code_breakpoints[index].break_on_data = false;
+
+	debug_state.breakpoint_count--;
 }
