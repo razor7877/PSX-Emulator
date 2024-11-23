@@ -26,13 +26,15 @@ cpu cpu_state = {
 void reset_emulator()
 {
     reset_cpu_state();
-    reset_debug_state();
+    reset_debug_state(false);
     reset_dma_state();
     reset_interrupt_state();
     reset_cdrom_state();
     reset_cop0_state();
     reset_gpu_state();
     reset_gl_state();
+
+    start_gl_state();
 }
 
 void reset_cpu_state()

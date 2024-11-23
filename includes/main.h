@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /// <summary>
 /// A struct used to contain the header data for a PSX EXE file 
@@ -21,3 +22,12 @@ typedef struct
 	int32_t initial_r29_r30_offset;
 	uint8_t a_func_placeholder[20];
 } EXEHeader;
+
+typedef struct
+{
+	bool finished_bios_boot;
+	EXEHeader file_header;
+	uint32_t* exe_contents;
+} MainState;
+
+int load_exe(const char* exe_path);

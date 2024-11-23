@@ -577,6 +577,16 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     }
 }
 
+static void drop_callback(GLFWwindow* window, int count, const char** paths)
+{
+    int i;
+    for (i = 0; i < count; i++)
+        log_info("Dropped file: %s\n", paths[i]);
+
+    if (load_exe(paths[0]) == 0)
+        reset_emulator();
+}
+
 static int setup_glfw()
 {
 	// Initialize GLFW context
@@ -601,6 +611,7 @@ static int setup_glfw()
     // Set callback functions for window resizing and handling input
     glfwSetKeyCallback(frontend_state.window, key_callback);
     glfwSetFramebufferSizeCallback(frontend_state.window, framebuffer_size_callback);
+    glfwSetDropCallback(frontend_state.window, drop_callback);
 
 	// Check if GLAD loaded successfully
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))

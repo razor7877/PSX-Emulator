@@ -16,7 +16,11 @@
 const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
 const char exe_path[] = "roms/psxtest_cpu.exe";
 
-bool finished_bios_boot = false;
+MainState main_state = {
+	.finished_bios_boot = false,
+	.file_header = {0},
+	.exe_contents = NULL,
+};
 
 static int load_bios(const char* path)
 {
@@ -56,11 +60,7 @@ static void print_exe_header(EXEHeader file_header)
 	log_info_no_prefix("\n--- SIDELOADED EXE HEADER END ---\n");
 }
 
-/// <summary>
-/// Attempts to sideload an EXE file into RAM after BIOS boot
-/// </summary>
-/// <returns>0 if the sideloading worked, -1 otherwise</returns>
-static int sideload_exe()
+int load_exe(const char* exe_path)
 {
 	FILE* exe_file = fopen(exe_path, "rb");
 	if (!exe_file)
@@ -79,14 +79,41 @@ static int sideload_exe()
 		return -1;
 	}
 
-	EXEHeader file_header = {0};
-	fread(&file_header, sizeof(uint8_t), sizeof(file_header), exe_file);
+	memset(&main_state.file_header, 0, sizeof(main_state.file_header));
+	fread(&main_state.file_header, sizeof(uint8_t), sizeof(main_state.file_header), exe_file);
 	rewind(exe_file);
 
-	print_exe_header(file_header);
+	print_exe_header(main_state.file_header);
 
-	sideload_exe_into_mem(file_header, exe_file);
-	finished_bios_boot = true;
+	if (main_state.exe_contents != NULL)
+		free(main_state.exe_contents);
+
+	main_state.exe_contents = malloc(main_state.file_header.file_size);
+
+	if (main_state.exe_contents == NULL)
+	{
+		log_error("Error while trying to allocate memory for the EXE contents!\n");
+		return -1;
+	}
+
+	// Seek the end of the header to load the actual EXE data
+	fseek(exe_file, 0x800, SEEK_SET);
+	// Load the EXE data into RAM
+	fread(main_state.exe_contents, sizeof(uint32_t), main_state.file_header.file_size / 4, exe_file);
+
+	main_state.finished_bios_boot = false;
+
+	return 0;
+}
+
+/// <summary>
+/// Attempts to sideload an EXE file into RAM after BIOS boot
+/// </summary>
+/// <returns>0 if the sideloading worked, -1 otherwise</returns>
+static int sideload_exe()
+{
+	sideload_exe_into_mem(main_state.file_header, main_state.exe_contents);
+	main_state.finished_bios_boot = true;
 
 	return 0;
 }
@@ -103,6 +130,9 @@ int main(int argc, char** argv)
 		log_error("Couldn't load BIOS at startup!\n");
 		return -1;
 	}
+
+	if (load_exe(exe_path) != 0)
+		log_warning("Couldn't load EXE file at startup!\n");
 
 	if (start_interface() != 0)
 	{
@@ -126,7 +156,7 @@ int main(int argc, char** argv)
 			handle_instruction(debug_state.print_instructions);
 			cycle_count++;
 
-			if (!finished_bios_boot && cpu_state.pc == 0x80030000)
+			if (!main_state.finished_bios_boot && cpu_state.pc == 0x80030000)
 				sideload_exe();
 		}
 

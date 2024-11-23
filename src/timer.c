@@ -106,7 +106,7 @@ void system_clock_tick(int cycles)
 
 	timer_state.dot_clock_internal += cycles;
 
-	int dot_clock = 0;
+	int dot_clock = DOT_CLK_256;
 
 	if (gpu_state.gpu_status.h_res_2 == H_RES_368)
 		dot_clock = DOT_CLK_368;

@@ -31,12 +31,15 @@ char* menu_string = {
 	"t - show cpu trace\n"
 };
 
-void reset_debug_state()
+void reset_debug_state(bool reset_breakpoints)
 {
-	memset(debug_state.code_breakpoints, 0, sizeof(debug_state.code_breakpoints));
-	debug_state.breakpoint_count = 0;
-	debug_state.in_debug = false;
-	debug_state.print_instructions = false;
+	if (reset_breakpoints)
+	{
+		memset(debug_state.code_breakpoints, 0, sizeof(debug_state.code_breakpoints));
+		debug_state.breakpoint_count = 0;
+		debug_state.in_debug = false;
+		debug_state.print_instructions = false;
+	}
 
 	memset(debug_state.cpu_trace, 0, sizeof(debug_state.cpu_trace));
 	debug_state.trace_start = 0;

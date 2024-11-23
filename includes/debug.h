@@ -69,7 +69,7 @@ typedef struct
 
 extern DebugState debug_state;
 
-void reset_debug_state();
+void reset_debug_state(bool reset_breakpoints);
 
 /// <summary>
 /// Queries user input for the debugger

@@ -64,10 +64,7 @@ void gui_update()
     if (igBeginMenu("Run", true))
     {
         if (igMenuItemEx("Reset", NULL, NULL, false, true))
-        {
             reset_emulator();
-            start_gl_state();
-        }
 
         igEndMenu();
     }
@@ -164,7 +161,7 @@ void gui_update()
             pushed_color = true;
         }
 
-        igText("%x | %s - %08x\tRS(r%d): %x RT(r%d): %x RD(r%d): %x\n",
+        igText("%08x | %s - %08x\tRS(r%d): %x RT(r%d): %x RD(r%d): %x\n",
             opcode_address, disassembly, opcode,
             rs(opcode), R(rs(opcode)),
             rt(opcode), R(rt(opcode)),
@@ -272,14 +269,14 @@ void gui_update()
     igText("pc: ");
     igPopStyleColor(1);
     igSameLine(0, -1);
-    igText("%08x", cpu_state.pc);
+    igText("%08x ", cpu_state.pc);
     igSameLine(0, 30);
 
     igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
     igText("hi: ");
     igPopStyleColor(1);
     igSameLine(0, -1);
-    igText("%08x", cpu_state.hi);
+    igText("%08x ", cpu_state.hi);
     igSameLine(0, 30);
 
     igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });

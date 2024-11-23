@@ -343,7 +343,7 @@ void load_bios_into_mem(FILE* bios_file)
 	fread(&bios_rom, sizeof(uint8_t), 512 * KIB_SIZE, bios_file);
 }
 
-void sideload_exe_into_mem(EXEHeader file_header, FILE* exe_file)
+void sideload_exe_into_mem(EXEHeader file_header, uint32_t* exe_file)
 {
 	// Set the registers using the header info
 	cpu_state.pc = file_header.initial_pc;
@@ -362,8 +362,5 @@ void sideload_exe_into_mem(EXEHeader file_header, FILE* exe_file)
 	if ((file_size % 0x800) != 0)
 		log_error("Sideloaded EXE file size is not a multiple of 0x800!\n");
 
-	// Seek the end of the header to load the actual EXE data
-	fseek(exe_file, 0x800, SEEK_SET);
-	// Load the EXE data into RAM
-	fread(&ram[destination_address / 4], sizeof(uint32_t), file_size / 4, exe_file);
+	memcpy(&ram[destination_address / 4], exe_file, file_size);
 }
