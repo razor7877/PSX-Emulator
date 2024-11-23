@@ -11,6 +11,12 @@ InterruptState interrupt_regs = {
 	.I_MASK = 0
 };
 
+void reset_interrupt_state()
+{
+	interrupt_regs.I_STAT = 0;
+	interrupt_regs.I_MASK = 0;
+}
+
 uint32_t read_interrupt_control(uint32_t address)
 {
 	if (address == 0x1F801070)

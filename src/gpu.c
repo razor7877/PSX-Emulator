@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "frontend/gl.h"
 #include "gpu.h"
 #include "logging.h"
@@ -26,6 +28,11 @@ GPU gpu_state = {
 	.display_range_vertical = 0,
 	.vram = {0},
 };
+
+void reset_gpu_state()
+{
+	memset(&gpu_state, 0, sizeof(gpu_state));
+}
 
 uint32_t read_gpu(uint32_t address)
 {

@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "cdrom.h"
 #include "logging.h"
 #include "debug.h"
@@ -14,6 +16,11 @@ CDController cd_controller = {
 	.pending_cdrom_irq = false,
 	.cycles_until_irq = 0,
 };
+
+void reset_cdrom_state()
+{
+	memset(&cd_controller, 0, sizeof(cd_controller));
+}
 
 uint32_t read_cdrom(uint32_t address)
 {

@@ -31,6 +31,20 @@ char* menu_string = {
 	"t - show cpu trace\n"
 };
 
+void reset_debug_state()
+{
+	memset(debug_state.code_breakpoints, 0, sizeof(debug_state.code_breakpoints));
+	debug_state.breakpoint_count = 0;
+	debug_state.in_debug = false;
+	debug_state.print_instructions = false;
+
+	memset(debug_state.cpu_trace, 0, sizeof(debug_state.cpu_trace));
+	debug_state.trace_start = 0;
+
+	memset(debug_state.tty, 0, sizeof(debug_state.tty));
+	debug_state.char_index = 0;
+}
+
 /// <summary>
 /// Queries user input to create a new code breakpoint
 /// </summary>
@@ -175,30 +189,48 @@ void add_cpu_trace(cpu cpu_state)
 void check_code_breakpoints(uint32_t address)
 {
 	// Check for any reached breakpoints
-	for (int i = 0; i < MAX_BREAKPOINTS; i++)
+	for (int i = 0; i < MAX_BREAKPOINTS; i += 4)
 	{
-		Breakpoint br = debug_state.code_breakpoints[i];
+		Breakpoint* br0 = &debug_state.code_breakpoints[i * 4];
+		Breakpoint* br1 = &debug_state.code_breakpoints[i * 4 + 1];
+		Breakpoint* br2 = &debug_state.code_breakpoints[i * 4 + 2];
+		Breakpoint* br3 = &debug_state.code_breakpoints[i * 4 + 3];
 
-		if (br.in_use && br.enabled && br.break_on_code && address == br.address)
-		{
-			log_info_no_prefix("Reached code breakpoint at %x\n", debug_state.code_breakpoints[i]);
+		if (br0->in_use && br0->enabled && br0->break_on_code && address == br0->address)
 			debug_state.in_debug = true;
-		}
+
+		if (br1->in_use && br1->enabled && br1->break_on_code && address == br1->address)
+			debug_state.in_debug = true;
+
+		if (br2->in_use && br2->enabled && br2->break_on_code && address == br2->address)
+			debug_state.in_debug = true;
+
+		if (br3->in_use && br3->enabled && br3->break_on_code && address == br3->address)
+			debug_state.in_debug = true;
 	}
 }
 
 void check_data_breakpoints(uint32_t address)
 {
 	// Check for any reached breakpoints
-	for (int i = 0; i < MAX_BREAKPOINTS; i++)
+	for (int i = 0; i < MAX_BREAKPOINTS; i += 4)
 	{
-		Breakpoint br = debug_state.code_breakpoints[i];
+		Breakpoint* br0 = &debug_state.code_breakpoints[i * 4];
+		Breakpoint* br1 = &debug_state.code_breakpoints[i * 4 + 1];
+		Breakpoint* br2 = &debug_state.code_breakpoints[i * 4 + 2];
+		Breakpoint* br3 = &debug_state.code_breakpoints[i * 4 + 3];
 
-		if (br.in_use && br.enabled && br.break_on_data && address == br.address)
-		{
-			log_info_no_prefix("Reached data breakpoint at %x\n", debug_state.code_breakpoints[i]);
+		if (br0->in_use && br0->enabled && br0->break_on_data && address == br0->address)
 			debug_state.in_debug = true;
-		}
+
+		if (br1->in_use && br1->enabled && br1->break_on_data && address == br1->address)
+			debug_state.in_debug = true;
+
+		if (br2->in_use && br2->enabled && br2->break_on_data && address == br2->address)
+			debug_state.in_debug = true;
+
+		if (br3->in_use && br3->enabled && br3->break_on_data && address == br3->address)
+			debug_state.in_debug = true;
 	}
 }
 

@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <string.h>
 
 #include "timer.h"
 #include "logging.h"
@@ -8,6 +9,11 @@
 #include "cdrom.h"
 
 TimerState timer_state = {0};
+
+void reset_timer_state()
+{
+	memset(&timer_state, 0, sizeof(timer_state));
+}
 
 uint32_t read_timer(uint32_t address)
 {

@@ -27,6 +27,8 @@ typedef struct
 /// Functions and state for emulating the PSX interrupt behavior
 /// </summary>
 
+void reset_interrupt_state();
+
 /// <summary>
 /// Reads from an interrupt related register and returns the contents
 /// </summary>

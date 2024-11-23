@@ -2,10 +2,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "cpu.h"
 
-#define MAX_BREAKPOINTS 32
+#define MAX_BREAKPOINTS 8
 #define CPU_TRACE_SIZE 40
 #define TTY_BUFFER_SIZE (2048 * 32)
 
@@ -67,6 +68,8 @@ typedef struct
 } DebugState;
 
 extern DebugState debug_state;
+
+void reset_debug_state();
 
 /// <summary>
 /// Queries user input for the debugger

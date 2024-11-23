@@ -8,6 +8,10 @@
 #include "interrupt.h"
 #include "timer.h"
 #include "memory.h"
+#include "dma.h"
+#include "cdrom.h"
+#include "gpu.h"
+#include "frontend/gl.h"
 
 cpu cpu_state = {
     .registers = {0},
@@ -18,6 +22,18 @@ cpu cpu_state = {
     .delay_jump = false,
     .jmp_address = 0x00
 };
+
+void reset_emulator()
+{
+    reset_cpu_state();
+    reset_debug_state();
+    reset_dma_state();
+    reset_interrupt_state();
+    reset_cdrom_state();
+    reset_cop0_state();
+    reset_gpu_state();
+    reset_gl_state();
+}
 
 void reset_cpu_state()
 {

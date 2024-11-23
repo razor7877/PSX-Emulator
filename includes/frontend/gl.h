@@ -215,9 +215,17 @@ typedef struct
 	/// The current size of the window, in pixels
 	/// </summary>
 	Vec2 window_size;
+
+	GLuint vram_tex;
+	GLuint blit_quad_vao;
+	GLuint blit_quad_vbo;
+	GLuint blit_quad_texture_bo;
 } Frontend;
 
 extern Frontend frontend_state;
+
+void start_gl_state();
+void reset_gl_state();
 
 /// <summary>
 /// Draws a pixel into the PSX internal framebuffer
@@ -252,6 +260,8 @@ static GLuint compile_shader(const char* v_shader, const char* f_shader);
 /// </summary>
 /// <param name="render_target">The render target in which the state should be stored</param>
 static void create_framebuffer(RenderTarget* render_target);
+
+static void delete_framebuffer(RenderTarget* render_target);
 
 /// <summary>
 /// Resizes the PSX framebuffer

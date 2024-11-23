@@ -34,6 +34,11 @@ const char dma_direction_str[][20] = {
 	"ram to device"
 };
 
+void reset_dma_state()
+{
+	memset(&dma_regs, 0, sizeof(&dma_regs));
+}
+
 uint32_t read_dma_regs(uint32_t address)
 {
 	if (address >= DMA_CHANNELS_START && address < DMA_CHANNELS_END)

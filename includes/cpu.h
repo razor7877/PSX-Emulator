@@ -110,6 +110,8 @@ typedef struct
 
 extern cpu cpu_state;
 
+void reset_emulator();
+
 /// <summary>
 /// Resets the state of the CPU
 /// </summary>

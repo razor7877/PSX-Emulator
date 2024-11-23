@@ -76,6 +76,8 @@ typedef struct
 	int sys_clock_8_internal;
 } TimerState;
 
+void reset_timer_state();
+
 uint32_t read_timer(uint32_t address);
 void write_timer(uint32_t address, uint32_t value);
 

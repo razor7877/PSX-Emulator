@@ -1,22 +1,26 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include <cimgui.h>
 
 #include "frontend/gl.h"
+#include "frontend/ui.h"
 #include "cpu.h"
 #include "memory.h"
 #include "debug.h"
 
-static ImGuiContext* ctx;
-static ImGuiIO* io;
+UIState ui_state = {
+    .ctx = NULL,
+    .io = NULL
+};
 
 void gui_init()
 {
-    ctx = igCreateContext(NULL);
-    io = igGetIO();
-    io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    ui_state.ctx = igCreateContext(NULL);
+    ui_state.io = igGetIO();
+    ui_state.io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     const char* glsl_version = "#version 410 core";
     ImGui_ImplGlfw_InitForOpenGL(frontend_state.window, true);
@@ -30,7 +34,7 @@ void gui_terminate()
 {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
-    igDestroyContext(ctx);
+    igDestroyContext(ui_state.ctx);
 }
 
 void gui_render()
@@ -53,6 +57,17 @@ void gui_update()
     if (igBeginMenu("File", true))
     {
         igMenuItemEx("Load file", NULL, NULL, false, true);
+
+        igEndMenu();
+    }
+
+    if (igBeginMenu("Run", true))
+    {
+        if (igMenuItemEx("Reset", NULL, NULL, false, true))
+        {
+            reset_emulator();
+            start_gl_state();
+        }
 
         igEndMenu();
     }
@@ -149,7 +164,7 @@ void gui_update()
             pushed_color = true;
         }
 
-        igText("%x : %s - %x\tRS(r%d): %x RT(r%d): %x RD(r%d): %x\n",
+        igText("%x | %s - %08x\tRS(r%d): %x RT(r%d): %x RD(r%d): %x\n",
             opcode_address, disassembly, opcode,
             rs(opcode), R(rs(opcode)),
             rt(opcode), R(rt(opcode)),
@@ -284,31 +299,14 @@ void gui_update()
 
         if ((i % 4) != 3)
             igSameLine(0, 30);
-
-        /*igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
-        igText("r%02d: ", i * 4 + 1);
-        igPopStyleColor(1);
-        igSameLine(0, -1);
-        igText("%08x", cpu_state.registers[i * 4 + 1]);
-        igSameLine(0, 30);
-
-        igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
-        igText("r%02d: ", i * 4 + 2);
-        igPopStyleColor(1);
-        igSameLine(0, -1);
-        igText("%08x", cpu_state.registers[i * 4 + 2]);
-        igSameLine(0, 30);
-
-        igPushStyleColor_Vec4(ImGuiCol_Text, (struct ImVec4) { 0.8f, 0.8f, 1.0f, 1.0f });
-        igText("r%02d: ", i * 4 + 3);
-        igPopStyleColor(1);
-        igSameLine(0, -1);
-        igText("%08x", cpu_state.registers[i * 4 + 3]);*/
     }
 
     igEnd();
 
     igBegin("TTY Output", NULL, ImGuiWindowFlags_None);
+
+    if (igButton("Clear", (struct ImVec2) { 80, 20 }))
+        memset(debug_state.tty, 0, sizeof(debug_state.tty));
 
     igText("%s", debug_state.tty);
 

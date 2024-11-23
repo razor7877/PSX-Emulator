@@ -299,6 +299,8 @@ typedef struct
 
 extern GPU gpu_state;
 
+void reset_gpu_state();
+
 /// <summary>
 /// Reads from a memory address located in the GPU
 /// </summary>

@@ -52,6 +52,8 @@ typedef struct
 	int cycles_until_irq;
 } CDController;
 
+void reset_cdrom_state();
+
 uint32_t read_cdrom(uint32_t address);
 void write_cdrom(uint32_t address, uint32_t value);
 

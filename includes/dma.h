@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 /// <summary>
 /// Functions and state for emulating the different transfers of the DMA controller
@@ -73,6 +74,8 @@ typedef struct
 	uint32_t dpcr;
 	uint32_t dicr;
 } DMA;
+
+void reset_dma_state();
 
 uint32_t read_dma_regs(uint32_t address);
 void write_dma_regs(uint32_t address, uint32_t value);

@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <string.h>
 
 #include "coprocessor.h"
 #include "cpu.h"
@@ -6,6 +7,11 @@
 #include "debug.h"
 
 uint32_t _cop0_registers[64] = { 0 };
+
+void reset_cop0_state()
+{
+    memset(_cop0_registers, 0, sizeof(_cop0_registers));
+}
 
 static void mfc()
 {

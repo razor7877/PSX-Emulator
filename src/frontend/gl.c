@@ -113,11 +113,6 @@ const float quad_tex_coords[] = {
     0.0f, 1.0f, // Bottom left
 };
 
-GLuint vram_tex = 0;
-GLuint blit_quad_vao = 0;
-GLuint blit_quad_vbo = 0;
-GLuint blit_quad_texture_bo = 0;
-
 Frontend frontend_state = {
 	.window = NULL,
     .fullscreen_mode = false,
@@ -143,6 +138,72 @@ Frontend frontend_state = {
         .y = WINDOW_HEIGHT,
     },
 };
+
+static void setup_blit_quad()
+{
+    // Generate VAO and VBO and bind them
+    glGenVertexArrays(1, &frontend_state.blit_quad_vao);
+    glGenBuffers(1, &frontend_state.blit_quad_vbo);
+
+    glBindVertexArray(frontend_state.blit_quad_vao);
+
+    // Send vertices
+    glBindBuffer(GL_ARRAY_BUFFER, frontend_state.blit_quad_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_verts), quad_verts, GL_STATIC_DRAW);
+
+    // Enable layout 0 input in shader
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Send tex coords
+    glGenBuffers(1, &frontend_state.blit_quad_texture_bo);
+
+    glBindBuffer(GL_ARRAY_BUFFER, frontend_state.blit_quad_texture_bo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_tex_coords), quad_tex_coords, GL_STATIC_DRAW);
+
+    // Enable layout 1 input in shader
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+}
+
+void start_gl_state()
+{
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    frontend_state.color_shader = compile_shader(color_v_shader, color_f_shader);
+    frontend_state.texture_shader = compile_shader(texture_v_shader, texture_f_shader);
+    frontend_state.blit_shader = compile_shader(blit_v_shader, blit_f_shader);
+
+    create_framebuffer(&PSX_RT);
+    create_framebuffer(&VRAM_RT);
+
+    setup_blit_quad();
+
+    // Render texture for the VRAM
+    glGenTextures(1, &frontend_state.vram_tex);
+    glBindTexture(GL_TEXTURE_2D, frontend_state.vram_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, VRAM_WIDTH, VRAM_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV, 0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+}
+
+void reset_gl_state()
+{
+    glDeleteProgram(frontend_state.color_shader);
+    glDeleteProgram(frontend_state.texture_shader);
+    glDeleteProgram(frontend_state.blit_shader);
+
+    glDeleteTextures(1, &frontend_state.vram_tex);
+
+    glDeleteVertexArrays(1, &frontend_state.blit_quad_vao);
+    glDeleteBuffers(1, &frontend_state.blit_quad_vbo);
+    glDeleteBuffers(1, &frontend_state.blit_quad_texture_bo);
+
+    delete_framebuffer(&PSX_RT);
+    delete_framebuffer(&VRAM_RT);
+}
 
 void draw_pixel(uint16_t x_coord, uint16_t y_coord, uint8_t red, uint8_t green, uint8_t blue)
 {
@@ -631,15 +692,8 @@ static void create_framebuffer(RenderTarget* render_target)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void resize_psx_framebuffer(Vec2 new_size)
+static void delete_framebuffer(RenderTarget* render_target)
 {
-    resize_framebuffer(&PSX_RT, new_size);
-}
-
-static void resize_framebuffer(RenderTarget* render_target, Vec2 new_size)
-{
-    render_target->size = new_size;
-    
     glDeleteFramebuffers(1, &render_target->framebuffer);
     glDeleteRenderbuffers(1, &render_target->depth_stencil_buffer);
     glDeleteTextures(1, &render_target->render_texture);
@@ -647,35 +701,19 @@ static void resize_framebuffer(RenderTarget* render_target, Vec2 new_size)
     render_target->framebuffer = 0;
     render_target->depth_stencil_buffer = 0;
     render_target->render_texture = 0;
-
-    create_framebuffer(render_target);
 }
 
-static void setup_blit_quad()
+void resize_psx_framebuffer(Vec2 new_size)
 {
-    // Generate VAO and VBO and bind them
-    glGenVertexArrays(1, &blit_quad_vao);
-    glGenBuffers(1, &blit_quad_vbo);
+    resize_framebuffer(&PSX_RT, new_size);
+}
 
-    glBindVertexArray(blit_quad_vao);
+static void resize_framebuffer(RenderTarget* render_target, Vec2 new_size)
+{
+    delete_framebuffer(render_target);
 
-    // Send vertices
-    glBindBuffer(GL_ARRAY_BUFFER, blit_quad_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_verts), quad_verts, GL_STATIC_DRAW);
-
-    // Enable layout 0 input in shader
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // Send tex coords
-    glGenBuffers(1, &blit_quad_texture_bo);
-
-    glBindBuffer(GL_ARRAY_BUFFER, blit_quad_texture_bo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_tex_coords), quad_tex_coords, GL_STATIC_DRAW);
-
-    // Enable layout 1 input in shader
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
+    render_target->size = new_size;
+    create_framebuffer(render_target);
 }
 
 int start_interface()
@@ -683,26 +721,7 @@ int start_interface()
 	if (setup_glfw() != 0)
 		return -1;
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    frontend_state.color_shader = compile_shader(color_v_shader, color_f_shader);
-    frontend_state.texture_shader = compile_shader(texture_v_shader, texture_f_shader);
-    frontend_state.blit_shader = compile_shader(blit_v_shader, blit_f_shader);
-
-    create_framebuffer(&PSX_RT);
-    create_framebuffer(&VRAM_RT);
-
-    setup_blit_quad();
-
-    // Render texture for the VRAM
-    glGenTextures(1, &vram_tex);
-    glBindTexture(GL_TEXTURE_2D, vram_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, VRAM_WIDTH, VRAM_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV, 0);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
+    start_gl_state();
     gui_init();
 
 	return 0;
@@ -711,7 +730,7 @@ int start_interface()
 static void update_vram()
 {
     // Send VRAM data to the texture
-    glBindTexture(GL_TEXTURE_2D, vram_tex);
+    glBindTexture(GL_TEXTURE_2D, frontend_state.vram_tex);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, VRAM_WIDTH, VRAM_HEIGHT, GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV, gpu_state.vram);
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -719,12 +738,12 @@ static void update_vram()
     glBindFramebuffer(GL_FRAMEBUFFER, VRAM_RT.framebuffer);
     glViewport(0, 0, VRAM_WIDTH, VRAM_HEIGHT);
 
-    glBindVertexArray(blit_quad_vao);
+    glBindVertexArray(frontend_state.blit_quad_vao);
 
     glUseProgram(frontend_state.blit_shader);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, vram_tex);
+    glBindTexture(GL_TEXTURE_2D, frontend_state.vram_tex);
     glUniform1i(glGetUniformLocation(frontend_state.blit_shader, "textureSampler"), 0);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -775,6 +794,8 @@ int update_interface()
 void stop_interface()
 {
     gui_terminate();
+
+    reset_gl_state();
 
 	glfwDestroyWindow(frontend_state.window);
 	glfwTerminate();
