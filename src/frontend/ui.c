@@ -2,9 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
-#include <cimgui.h>
-
 #include "frontend/gl.h"
 #include "frontend/ui.h"
 #include "cpu.h"
@@ -134,7 +131,7 @@ void gui_update()
         // Get secondary opcode from 6 lowest bits
         uint8_t secondary_opcode = opcode & 0x3F;
 
-        char* disassembly = primary_opcodes[primary_opcode].disassembly;
+        const char* disassembly = primary_opcodes[primary_opcode].disassembly;
         if (primary_opcode == 0x00)
             disassembly = secondary_opcodes[secondary_opcode].disassembly;
 
