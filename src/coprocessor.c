@@ -140,7 +140,7 @@ void handle_mem_exception(ExceptionType exception, uint32_t address)
 
 void handle_exception(ExceptionType exception)
 {
-    log_debug("Handling exception at PC %x\n", cpu_state.pc);
+    //log_debug("Handling exception at PC %x\n", cpu_state.pc);
 
     // Clear exception code bits
     CAUSE &= ~(0b11111 << 2);

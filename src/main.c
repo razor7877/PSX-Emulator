@@ -13,7 +13,7 @@
 #include "gpu.h"
 #include "interrupt.h"
 
-const char bios_path[] = "roms/Sony PlayStation SCPH-1001 - DTLH-3000 BIOS v2.2 (1995-12-04)(Sony)(US).bin";
+const char bios_path[] = "roms/Sony PlayStation SCPH-1002 BIOS v2.0 (1995-05-10)(Sony)(EU).bin";
 const char exe_path[] = "roms/psxtest_cpu.exe";
 
 MainState main_state = {
